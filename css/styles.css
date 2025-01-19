@@ -1,0 +1,496 @@
+.audio-component {
+    padding: 20px;
+    margin: 20px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background: #333;
+    margin: 10px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    
+}
+
+button {
+    padding: 10px 20px;
+    margin: 5px;
+    cursor: pointer;
+}
+
+.start-audio {
+    font-size: 1.2em;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+}
+
+.test-note {
+    background-color: #2196F3;
+    color: white;
+    border: none;
+    border-radius: 4px;
+}
+
+.test-note.active {
+    background-color: #f44336;
+    transform: scale(0.95);
+}
+
+.volume-control {
+    width: 200px;
+    margin: 10px;
+}
+
+.controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.transport-section {
+    background: #2c3e50;
+    padding: 15px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.transport-state {
+    color: #ecf0f1;
+    font-weight: bold;
+    min-width: 80px;
+}
+
+.beat-display {
+    display: flex;
+    gap: 2px;
+}
+
+.beat-indicator {
+    width: 20px;
+    height: 20px;
+    background: #34495e;
+    border-radius: 3px;
+}
+
+.beat-indicator.active {
+    background: #e74c3c;
+}
+
+.beat-indicator.bar-start {
+    border: 1px solid #95a5a6;
+}
+
+.current-beat {
+    color: #ecf0f1;
+    font-family: monospace;
+    font-size: 1.2em;
+    min-width: 40px;
+    text-align: center;
+}
+
+.tempo-section {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: #ecf0f1;
+}
+
+.tempo-section input {
+    width: 60px;
+    padding: 5px;
+    border-radius: 3px;
+    border: none;
+    background: #34495e;
+    color: #ecf0f1;
+}
+
+button.active {
+    background: #e74c3c;
+}
+
+.sequence-grid {
+    display: grid;
+    grid-template-columns: repeat(16, 1fr);
+    gap: 4px;
+    margin: 10px 0;
+    padding: 10px;
+    background: #34495e;
+    border-radius: 4px;
+}
+
+.sequence-step {
+    text-align: center;
+}
+
+.note-select {
+    width: 100%;
+    padding: 4px;
+    background: #2c3e50;
+    color: #ecf0f1;
+    border: 1px solid #95a5a6;
+    border-radius: 3px;
+}
+
+.sequence-step:nth-child(4n+1) .note-select {
+    border-color: #e74c3c;
+}
+
+.tb303 {
+    background: linear-gradient(45deg, #2c3e50, #34495e);
+    padding: 20px;
+    border-radius: 10px;
+    color: #ecf0f1;
+}
+
+
+.knob-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+}
+
+.knob {
+    width: 60px;
+    height: 60px;
+    appearance: none;
+    background: #95a5a6;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+
+
+.sequence-step {
+    background: #34495e;
+    padding: 5px;
+    border-radius: 3px;
+}
+
+.step-controls {
+    display: flex;
+    gap: 5px;
+    margin-top: 5px;
+    justify-content: center;
+}
+
+.toggle {
+    margin-right: 2px;
+}
+
+.accent {
+    color: #e74c3c;
+}
+
+.slide {
+    color: #3498db;
+}
+
+.gate {
+    color: #2ecc71;
+}
+
+.instrument-container {
+    border: 2px solid #34495e;
+    border-radius: 10px;
+    padding: 20px;
+    margin: 10px 0;
+    background: rgba(44, 62, 80, 0.1);
+    display: flex;
+    gap: 20px;
+    position: relative;
+    padding-left: 80px;
+    /* Add space for the mixer controls */
+}
+
+.instrument-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 60px;
+}
+
+
+
+.rack-mixer {
+    left: 0;
+    top: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 10px;
+    border-radius: 5px 0 0 5px;
+}
+
+.rack-volume {
+    -webkit-appearance: slider-vertical;
+    appearance: slider-vertical;
+    width: 20px;
+    height: 150px;
+    background: #2c3e50;
+    cursor: pointer;
+    margin: 0;
+}
+
+.rack-volume::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 10px;
+    background: #3498db;
+    cursor: pointer;
+    border-radius: 2px;
+}
+
+.rack-volume::-moz-range-thumb {
+    width: 20px;
+    height: 10px;
+    background: #3498db;
+    cursor: pointer;
+    border-radius: 2px;
+}
+
+.vu-meter {
+    border: 1px solid #95a5a6;
+    border-radius: 3px;
+    background: #2c3e50;
+}
+
+.vu-meter-container {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 2px;
+    background: #2c3e50;
+    /* padding: 5px; */
+    border-radius: 4px;
+    height: 150px;
+    /* flex-direction: column; */
+    /* width: 40px; */
+    flex-wrap: nowrap;
+}
+
+.vu-meter,
+.vu-meter-scale {
+    height: 150px;
+}
+
+.vu-meter {
+    border: 1px solid #34495e;
+    border-radius: 2px;
+}
+
+.vu-meter-scale {
+    border-right: 1px solid #34495e;
+}
+
+.instrument-container h2 {
+    margin-top: 0;
+    color: #2c3e50;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+.metronome-button.active {
+    background-color: #4CAF50;
+    color: white;
+}
+
+button {
+    padding: 10px 20px;
+    margin: 5px;
+    cursor: pointer;
+    border-radius: 4px solid #ccc;
+}
+
+.instrument-pattern-section {
+    margin-top: 20px;
+    padding: 10px;
+    background: #2a2a2a;
+    border-radius: 6px;
+}
+
+body {
+    background: #222;
+    color: #fff;
+    margin: 0;
+    padding: 20px;
+    font-family: 'Share Tech Mono', monospace;
+}
+
+.instrument-container {
+    margin: 30px;
+    padding: 25px;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    background: #2a2a2a;
+}
+
+/* Stili unici per ogni tipo di strumento */
+.instrument-container[data-type="tb303"] {
+    border: 2px solid #FF9500;
+    background: linear-gradient(45deg, #2C3137, #373D44);
+}
+
+.instrument-container[data-type="drummachine"] {
+    border: 2px solid #00ff9d;
+    background: linear-gradient(45deg, #1E2328, #272C32);
+}
+
+.instrument-container[data-type="monosynth"] {
+    border: 2px solid #ff3366;
+    background: linear-gradient(45deg, #2b1f2b, #1a151a);
+}
+
+.add-instrument-btn {
+    background: #34495e;
+    color: #ecf0f1;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 15px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.1s;
+    font-family: 'Share Tech Mono', monospace;
+}
+
+.add-instrument-btn:hover {
+    background: #3498db;
+}
+
+.add-instrument-btn:active {
+    transform: scale(0.95);
+}
+
+.instrument-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: #2c3e50;
+    padding: 30px;
+    border-radius: 10px;
+    position: relative;
+    min-width: 300px;
+}
+
+.modal-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    color: #ecf0f1;
+    font-size: 20px;
+    cursor: pointer;
+}
+
+.instrument-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.instrument-choice {
+    padding: 15px;
+    background: #34495e;
+    border: none;
+    border-radius: 5px;
+    color: white;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.instrument-choice:hover {
+    background: #2980b9;
+}
+
+.remove-instrument {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(231, 76, 60, 0.8);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.instrument-container:hover .remove-instrument {
+    opacity: 1;
+}
+
+.remove-instrument:hover {
+    background: rgb(231, 76, 60);
+}
+
+.studio-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 20px;
+    background: #333;
+    border-radius: 8px;
+}
+
+.instrument-rack {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-height: 200px;
+}
+
+.instrument-container {
+    background: #444;
+    padding: 15px;
+    border-radius: 6px;
+    position: relative;
+}
+
+.knob-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+    gap: 10px;
+    justify-items: center;
+}
+
+.knob-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+}
+
+.knob-wrap span {
+    font-size: 0.8em;
+    color: #888;
+}

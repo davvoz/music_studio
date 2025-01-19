@@ -1,0 +1,107 @@
+.knob-outer {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    position: relative;
+    background: linear-gradient(145deg, #323841, #272B33);
+    box-shadow: 
+        8px 8px 16px rgba(0,0,0,0.3),
+        -8px -8px 16px rgba(255,255,255,0.03);
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+.knob-marks {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+}
+
+.knob-mark {
+    position: absolute;
+    width: 2px;
+    height: 6px;
+    background: rgba(255,149,0,0.3);
+    left: 50%;
+    transform-origin: 0 25px;
+}
+
+.knob-inner {
+    position: absolute;
+    width: 80%;
+    height: 80%;
+    top: 10%;
+    left: 10%;
+    border-radius: 50%;
+    background: linear-gradient(145deg, #272B33, #323841);
+    box-shadow: 
+        inset 2px 2px 4px rgba(0,0,0,0.3),
+        inset -2px -2px 4px rgba(255,255,255,0.03);
+    transition: transform 0.1s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+.knob-indicator {
+    position: absolute;
+    width: 2px;
+    height: 40%;
+    background: #e74c3c;
+    left: calc(50% - 1px);
+    top: 10%;
+    transform-origin: bottom center;
+    transition: transform 0.1s ease;
+}
+
+.knob-center {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: #FF9500;
+    border-radius: 50%;
+    top: calc(50% - 5px);
+    left: calc(50% - 5px);
+    box-shadow: 0 0 10px rgba(255,149,0,0.4);
+}
+
+.knob-outer:active {
+    cursor: grabbing;
+}
+
+/* Fine-tuning for specific sizes */
+[style*="width: 50px"] .knob-mark {
+    transform-origin: 0 20px;
+    height: 6px;
+}
+
+[style*="width: 100px"] .knob-mark {
+    transform-origin: 0 45px;
+    height: 10px;
+}
+
+.knob-value {
+    text-align: center;
+    margin-top: 4px;
+    font-size: 12px;
+    color: #95a5a6;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+.knob-body {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: #2c3e50;
+    position: relative;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.knob-body.active {
+    background: #34495e;
+}

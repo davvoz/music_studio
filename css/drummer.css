@@ -1,0 +1,224 @@
+.drum-machine {
+    background: linear-gradient(45deg, #1E2328, #272C32);
+    border: 2px solid #00ff9d;
+    box-shadow: 
+        0 0 30px rgba(0, 255, 157, 0.1),
+        inset 0 2px 10px rgba(0, 0, 0, 0.5);
+    border-radius: 20px;
+    padding: 25px;
+    box-shadow:
+        inset 0 0 30px rgba(0, 0, 0, 0.4),
+        0 10px 20px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.drum-controls {
+    background: linear-gradient(to bottom, #1E2328, #272C32);
+    padding: 20px;
+    border-radius: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow:
+        inset 0 1px 1px rgba(255, 255, 255, 0.05),
+        0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+.drum-knobs {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+}
+
+.drum-grid {
+    margin-top: 25px;
+    background: linear-gradient(to bottom, #1E2328, #272C32);
+    padding: 20px;
+    border-radius: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.drum-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.drum-cell {
+    width: 40px;
+    height: 40px;
+    background: #2C3137;
+    border: 1px solid rgba(0, 255, 157, 0.2);
+    border-radius: 8px;
+    box-shadow:
+        inset 0 1px 2px rgba(0, 0, 0, 0.2),
+        0 1px 1px rgba(255, 255, 255, 0.02);
+    cursor: pointer;
+}
+
+.drum-cell.active {
+    background: #00ff9d;
+    box-shadow: 0 0 15px rgba(0, 255, 157, 0.3);
+}
+
+.drum-cell.playing {
+    border-color: #FF9500;
+    box-shadow: 0 0 15px rgba(255, 149, 0, 0.2);
+}
+
+/* Add alternating bar indicators */
+.drum-cell[data-step="0"],
+.drum-cell[data-step="4"],
+.drum-cell[data-step="8"],
+.drum-cell[data-step="12"] {
+    border-left: 2px solid rgba(255, 149, 0, 0.3);
+}
+
+.drum-samples {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #1E2328;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.sample-loader {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    background: #272C32;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer; /* aggiungi il cursore pointer */
+}
+
+.sample-loader span {
+    color: #FF9500;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.sample-loader input[type="file"] {
+    display: none;
+}
+
+.sample-loader::after {
+    content: '+ Load Sample';
+    padding: 6px 12px;
+    background: #1E2328;
+    color: #FF9500;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    pointer-events: none; /* impedisce che l'pseudo-elemento interferisca con il click */
+}
+
+.sample-loader:hover::after {
+    background: #FF9500;
+    color: #1E2328;
+}
+
+.sample-status {
+    font-size: 10px;
+    color: #808080;
+    text-align: center;
+    min-height: 14px;
+}
+
+.sample-status.loaded {
+    color: #FF9500;
+}
+
+.pattern-selector {
+    min-width: 120px;
+    margin-top: 20px;
+}
+
+.pattern-buttons {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    margin-bottom: 12px;
+}
+
+.pattern-btn {
+    width: auto;
+    min-width: 50px;
+    height: 25px;
+    background: #1E2328;
+    border: 1px solid rgba(0, 255, 157, 0.3);
+    border-radius: 4px;
+    color: #00ff9d;
+    font-size: 11px;
+    padding: 0 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.pattern-memory {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    margin: 8px 0;
+}
+
+.memory-btn {
+    width: 25px;
+    height: 25px;
+    background: #1E2328;
+    border: 1px solid rgba(0, 255, 157, 0.3);
+    border-radius: 4px;
+    color: #00ff9d;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 0;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.pattern-actions {
+    display: flex;
+    justify-content: center;
+    margin-top: 8px;
+}
+
+.save-btn {
+    background: #1E2328;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: 4px;
+    color: #808080;
+    font-size: 10px;
+    padding: 4px 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.pattern-btn:active,
+.pattern-btn.active,
+.memory-btn.active {
+    color: #FF9500;
+    border-color: #FF9500;
+    box-shadow: 0 0 10px rgba(255, 149, 0, 0.2);
+    background: #272B33;
+    transform: scale(0.95);
+}
+
+.memory-btn.saving {
+    animation: savingPulse 1s infinite;
+    border-color: #FF9500;
+}
+
+.memory-btn.saved {
+    background: #FF9500;
+    color: #1E2328;
+}
+
+@keyframes savingPulse {
+    0% { transform: scale(1); background: #1E2328; }
+    50% { transform: scale(1.1); background: #272B33; }
+    100% { transform: scale(1); background: #1E2328; }
+}
