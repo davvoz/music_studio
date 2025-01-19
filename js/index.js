@@ -7,6 +7,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const audioEngine = new AudioEngine();
     const renderEngine = new RenderEngine(audioEngine);
     
+    // Prevent scrolling on touch devices
+    document.body.addEventListener('touchmove', (e) => {
+        if (e.target.closest('.drummachineknob') || e.target.closest('.drum-cell')) {
+            e.preventDefault();
+        }
+    }, { passive: false });
+
     document.body.appendChild(renderEngine.render());
 
     // Example: Add a MonoSynth

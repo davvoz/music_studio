@@ -65,10 +65,14 @@ export class RenderEngine {
         
         const tempoInput = document.createElement('input');
         tempoInput.type = 'number';
-        tempoInput.value = this.audioEngine.tempo;
+        tempoInput.value = this.audioEngine.tempo / 4; // Dividiamo per 4 il valore visualizzato
         tempoInput.min = '30';
         tempoInput.max = '300';
-        tempoInput.onchange = (e) => this.audioEngine.setTempo(e.target.value);
+        tempoInput.onchange = (e) => {
+            const displayValue = parseInt(e.target.value);
+            const actualTempo = displayValue * 4; // Moltiplichiamo per 4 il valore inserito
+            this.audioEngine.setTempo(actualTempo);
+        };
 
         // Beat indicators
         const beatDisplay = document.createElement('div');

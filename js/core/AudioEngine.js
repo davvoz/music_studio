@@ -23,6 +23,41 @@ export class AudioEngine {
         this.metronomeGain = this.context.createGain();
         this.metronomeGain.connect(this.masterOutput);
         this.metronomeGain.gain.value = 0.5;
+
+        // Prevent audio suspension
+        this.setupAudioResume();
+    }
+
+    setupAudioResume() {
+        let resumeTimeout;
+        
+        // Lista di eventi che potrebbero sospendere l'audio
+        const events = ['scroll', 'touchstart', 'touchend', 'touchmove', 'mousedown', 'mouseup'];
+        
+        const resumeAudio = () => {
+            if (this.context.state === 'suspended' && this.isPlaying) {
+                this.context.resume();
+            }
+            // Riprogramma il check per 500ms dopo l'ultimo evento
+            clearTimeout(resumeTimeout);
+            resumeTimeout = setTimeout(() => {
+                if (this.context.state === 'suspended' && this.isPlaying) {
+                    this.context.resume();
+                }
+            }, 500);
+        };
+
+        // Aggiungi i listener con passive: true per migliori performance
+        events.forEach(event => {
+            window.addEventListener(event, resumeAudio, { passive: true });
+        });
+
+        // Check periodico dello stato
+        setInterval(() => {
+            if (this.context.state === 'suspended' && this.isPlaying) {
+                this.context.resume();
+            }
+        }, 1000);
     }
 
     addInstrument(id, instrument) {
@@ -41,10 +76,15 @@ export class AudioEngine {
     start() {
         if (this.isPlaying) return;
 
+        // Assicurati che il contesto audio sia attivo
         if (this.context.state === 'suspended') {
-            this.context.resume();
+            this.context.resume().then(() => this.startPlayback());
+        } else {
+            this.startPlayback();
         }
+    }
 
+    startPlayback() {
         this.isPlaying = true;
         this.currentBeat = 0;
         this.nextNoteTime = this.context.currentTime;
@@ -59,11 +99,22 @@ export class AudioEngine {
     }
 
     scheduler() {
+        // Verifica che il contesto sia attivo prima di schedulare
+        if (this.context.state === 'suspended') {
+            this.context.resume();
+        }
+
         while (this.nextNoteTime < this.context.currentTime + this.scheduleAheadTime) {
             this.scheduleBeat(this.currentBeat, this.nextNoteTime);
             this.nextBeat();
         }
-        this.timerID = setTimeout(() => this.scheduler(), this.lookAhead);
+
+        // Usa requestAnimationFrame invece di setTimeout per migliore sincronizzazione
+        if (this.isPlaying) {
+            requestAnimationFrame(() => {
+                setTimeout(() => this.scheduler(), this.lookAhead);
+            });
+        }
     }
 
     scheduleBeat(beat, time) {

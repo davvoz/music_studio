@@ -1,39 +1,105 @@
-.drum-machine {
-    background: linear-gradient(45deg, #1E2328, #272C32);
-    border: 2px solid #00ff9d;
-    box-shadow: 
-        0 0 30px rgba(0, 255, 157, 0.1),
-        inset 0 2px 10px rgba(0, 0, 0, 0.5);
-    border-radius: 20px;
-    padding: 25px;
-    box-shadow:
-        inset 0 0 30px rgba(0, 0, 0, 0.4),
-        0 10px 20px rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+:root {
+    --primary-bg: #1E2328;
+    --secondary-bg: #272C32;
+    --accent-color: #00ff9d;
+    --highlight-color: #FF9500;
+    --border-light: rgba(255, 255, 255, 0.1);
 }
 
-.drum-controls {
-    background: linear-gradient(to bottom, #1E2328, #272C32);
+.drum-machine {
+    background: linear-gradient(45deg, var(--primary-bg), var(--secondary-bg));
+    border: 2px solid var(--accent-color);
+    border-radius: 20px;
+    padding: 25px;
+    box-shadow: 
+        0 0 30px rgba(0, 255, 157, 0.1),
+        inset 0 0 30px rgba(0, 0, 0, 0.4);
+}
+
+.drum-controls, .drum-grid {
+    background: linear-gradient(to bottom, var(--primary-bg), var(--secondary-bg));
     padding: 20px;
     border-radius: 15px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-light);
     box-shadow:
         inset 0 1px 1px rgba(255, 255, 255, 0.05),
         0 5px 15px rgba(0, 0, 0, 0.2);
 }
 
 .drum-knobs {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+    padding: 15px;
+}
+
+.drum-knob-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: var(--primary-bg);
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border-light);
+}
+
+.main-controls {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.main-controls .knob-wrap {
+    transform: scale(0.9);
+}
+
+.distortion-controls {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: center;
+    padding: 10px;
+    background: var(--primary-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border-light);
+    margin-top: 10px;
+}
+
+.effects-controls {
+    grid-column: 1 / -1;
     display: flex;
     gap: 20px;
     justify-content: center;
+    padding: 15px;
+    background: var(--primary-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border-light);
+    margin-top: 10px;
 }
 
-.drum-grid {
-    margin-top: 25px;
-    background: linear-gradient(to bottom, #1E2328, #272C32);
-    padding: 20px;
-    border-radius: 15px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+.effect-group {
+    display: flex;
+    gap: 10px;
+    padding: 10px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.envelope-controls {
+    display: flex;
+    justify-content: space-around;
+    gap: 5px;
+    padding-top: 5px;
+}
+
+.envelope-controls .knob-wrap {
+    transform: scale(0.8);
+}
+
+.envelope-controls .knob-wrap span {
+    font-size: 10px;
+    opacity: 0.7;
 }
 
 .drum-row {
@@ -45,7 +111,7 @@
 .drum-cell {
     width: 40px;
     height: 40px;
-    background: #2C3137;
+    background: var(--secondary-bg);
     border: 1px solid rgba(0, 255, 157, 0.2);
     border-radius: 8px;
     box-shadow:
@@ -55,13 +121,18 @@
 }
 
 .drum-cell.active {
-    background: #00ff9d;
+    background: var(--accent-color);
     box-shadow: 0 0 15px rgba(0, 255, 157, 0.3);
 }
 
 .drum-cell.playing {
-    border-color: #FF9500;
+    border-color: var(--highlight-color);
     box-shadow: 0 0 15px rgba(255, 149, 0, 0.2);
+}
+
+.drum-cell.accent {
+    background: #ff3366;
+    box-shadow: 0 0 15px rgba(255, 51, 102, 0.3);
 }
 
 /* Add alternating bar indicators */
@@ -78,7 +149,7 @@
     gap: 15px;
     margin-bottom: 20px;
     padding: 15px;
-    background: #1E2328;
+    background: var(--primary-bg);
     border-radius: 10px;
     border: 1px solid rgba(255, 255, 255, 0.05);
 }
@@ -89,14 +160,14 @@
     align-items: center;
     gap: 8px;
     padding: 10px;
-    background: #272C32;
+    background: var(--secondary-bg);
     border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--border-light);
     cursor: pointer; /* aggiungi il cursore pointer */
 }
 
 .sample-loader span {
-    color: #FF9500;
+    color: var(--highlight-color);
     font-size: 12px;
     font-weight: 600;
 }
@@ -108,8 +179,8 @@
 .sample-loader::after {
     content: '+ Load Sample';
     padding: 6px 12px;
-    background: #1E2328;
-    color: #FF9500;
+    background: var(--primary-bg);
+    color: var(--highlight-color);
     border-radius: 4px;
     font-size: 11px;
     cursor: pointer;
@@ -118,8 +189,8 @@
 }
 
 .sample-loader:hover::after {
-    background: #FF9500;
-    color: #1E2328;
+    background: var(--highlight-color);
+    color: var(--primary-bg);
 }
 
 .sample-status {
@@ -149,10 +220,10 @@
     width: auto;
     min-width: 50px;
     height: 25px;
-    background: #1E2328;
+    background: var(--primary-bg);
     border: 1px solid rgba(0, 255, 157, 0.3);
     border-radius: 4px;
-    color: #00ff9d;
+    color: var(--accent-color);
     font-size: 11px;
     padding: 0 8px;
     cursor: pointer;
@@ -169,10 +240,10 @@
 .memory-btn {
     width: 25px;
     height: 25px;
-    background: #1E2328;
+    background: var(--primary-bg);
     border: 1px solid rgba(0, 255, 157, 0.3);
     border-radius: 4px;
-    color: #00ff9d;
+    color: var(--accent-color);
     font-size: 11px;
     font-weight: bold;
     padding: 0;
@@ -200,10 +271,10 @@
 .pattern-btn:active,
 .pattern-btn.active,
 .memory-btn.active {
-    color: #FF9500;
-    border-color: #FF9500;
+    color: var(--highlight-color);
+    border-color: var(--highlight-color);
     box-shadow: 0 0 10px rgba(255, 149, 0, 0.2);
-    background: #272B33;
+    background: var(--secondary-bg);
     transform: scale(0.95);
 }
 
@@ -213,12 +284,38 @@
 }
 
 .memory-btn.saved {
-    background: #FF9500;
-    color: #1E2328;
+    background: var(--highlight-color);
+    color: var(--primary-bg);
 }
 
 @keyframes savingPulse {
     0% { transform: scale(1); background: #1E2328; }
     50% { transform: scale(1.1); background: #272B33; }
     100% { transform: scale(1); background: #1E2328; }
+}
+
+.drummachineknob {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: var(--primary-bg);
+    border: 1px solid var(--border-light);
+    box-shadow:
+        inset 0 1px 1px rgba(255, 255, 255, 0.05),
+        0 5px 15px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    position: relative;
+    margin: 0 auto;
+}
+
+/* Animation for active elements */
+@keyframes glow {
+    0% { box-shadow: 0 0 5px #ff3366; }
+    50% { box-shadow: 0 0 15px #ff3366; }
+    100% { box-shadow: 0 0 5px #ff3366; }
+}
+
+.sequence-step.playing {
+    animation: glow 0.5s ease;
+    border-color: #00ff9d;
 }

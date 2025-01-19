@@ -68,31 +68,63 @@ export class DrumMachineRender extends AbstractHTMLRender {
     }
 
     createKnobs() {
-        const knobs = {
-            kickVolume: 'KICK',
-            snareVolume: 'SNARE',
-            hihatVolume: 'HIHAT',
-            clapVolume: 'CLAP'
-        };
-
         const knobsContainer = this.container.querySelector('.drum-knobs');
+        knobsContainer.innerHTML = '';
         
-        Object.entries(knobs).forEach(([param, label]) => {
-            const knobWrapper = document.createElement('div');
-            knobWrapper.className = 'knob-wrap';
-            knobWrapper.innerHTML = `<div class="knob"></div><span>${label}</span>`;
-            knobsContainer.appendChild(knobWrapper);
+        const drums = ['kick', 'snare', 'hihat', 'clap'];
+        drums.forEach(drum => {
+            const drumGroup = document.createElement('div');
+            drumGroup.className = 'drum-knob-group';
 
-            new Knob(knobWrapper.querySelector('.knob'), {
-                min: 0,
-                max: 1,
-                value: 0.7,
-                size: 60,
-                startAngle: 30,
-                endAngle: 330,
-                onChange: (v) => this.paramChangeCallback?.(param, v)
-            });
+            const mainControls = document.createElement('div');
+            mainControls.className = 'main-controls';
+            
+            // Volume knob
+            const volKnob = this.createKnobElement(`${drum}Volume`, `${drum.toUpperCase()}`, 0, 1, 0.7);
+            mainControls.appendChild(volKnob);
+            
+            // Pitch knob
+            const pitchKnob = this.createKnobElement(`${drum}Pitch`, 'PITCH', 0.5, 2, 1);
+            mainControls.appendChild(pitchKnob);
+            
+            drumGroup.appendChild(mainControls);
+            knobsContainer.appendChild(drumGroup);
         });
+    }
+
+    createKnobElement(param, label, min, max, defaultValue) {
+        const wrap = document.createElement('div');
+        wrap.className = 'knob-wrap';
+        wrap.innerHTML = `<div class="knob drummachineknob"></div><span>${label}</span>`;
+
+        const knob = new Knob(wrap.querySelector('.knob'), {
+            min,
+            max,
+            value: defaultValue,
+            size: 45,
+            startAngle: 30,
+            endAngle: 330,
+            onChange: (value) => {
+                this.paramChangeCallback?.(param, value);
+            }
+        });
+
+        wrap.knob = knob;
+        return wrap;
+    }
+
+    getDefaultFreq(drum) {
+        // Rimuoviamo questa funzione dato che non serve più
+    }
+
+    getDefaultEnvelopeValue(param) {
+        const defaults = {
+            Attack: 0.01,
+            Decay: 0.1,
+            Sustain: 0.5,
+            Release: 0.1
+        };
+        return defaults[param] || 0.1;
     }
 
     createSequencer() {
@@ -108,14 +140,22 @@ export class DrumMachineRender extends AbstractHTMLRender {
                 const cell = document.createElement('div');
                 cell.className = 'drum-cell';
                 cell.dataset.step = step;
+                
                 cell.addEventListener('click', () => {
-                    cell.classList.toggle('active');
-                    this.sequenceChangeCallback?.(
-                        drum,
-                        step,
-                        cell.classList.contains('active')
-                    );
+                    if (cell.classList.contains('active')) {
+                        if (cell.classList.contains('accent')) {
+                            cell.classList.remove('active', 'accent');
+                            this.sequenceChangeCallback?.(drum, step, false, 0);
+                        } else {
+                            cell.classList.add('accent');
+                            this.sequenceChangeCallback?.(drum, step, true, 1.5);
+                        }
+                    } else {
+                        cell.classList.add('active');
+                        this.sequenceChangeCallback?.(drum, step, true, 1);
+                    }
                 });
+
                 row.appendChild(cell);
             }
 
@@ -166,56 +206,134 @@ export class DrumMachineRender extends AbstractHTMLRender {
     }
 
     setupEventListeners() {
-        // Pattern generation handlers
-        this.container.querySelectorAll('.pattern-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const type = btn.dataset.pattern;
-                switch(type) {
-                    case 'basic':
-                        this.generateBasicPattern();
-                        break;
-                    case 'house':
-                        this.generateHousePattern();
-                        break;
-                    case 'break':
-                        this.generateBreakPattern();
-                        break;
-                }
-                btn.classList.add('active');
-                setTimeout(() => btn.classList.remove('active'), 200);
-            });
-        });
-
-        // Pattern memory handlers
-        this.container.querySelectorAll('.memory-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                if (this.isSaving) return;
-                
-                if (this.isSaveMode) {
-                    this.isSaving = true;
-                    this.savePattern(btn.dataset.slot);
-                    this.isSaveMode = false;
-                    this.container.querySelectorAll('.memory-btn').forEach(b => b.classList.remove('saving'));
-                    btn.classList.add('saved');
-                    setTimeout(() => {
-                        btn.classList.remove('saved');
-                        this.isSaving = false;
-                    }, 300);
-                } else {
-                    this.loadPattern(btn.dataset.slot);
-                    this.container.querySelectorAll('.memory-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                }
-            });
-        });
-
-        this.container.querySelector('.save-btn').addEventListener('click', () => {
-            if (this.isSaving) return;
+        // Ottimizza gestione eventi
+        this._eventThrottle = null;
+        
+        const handleEvent = (e) => {
+            if (this._eventThrottle) return;
             
+            this._eventThrottle = setTimeout(() => {
+                this._eventThrottle = null;
+            }, 16);
+
+            const target = e.target;
+            if (target.closest('.drum-cell')) {
+                this.handleCellClick(target.closest('.drum-cell'));
+            } else if (target.closest('.pattern-btn')) {
+                this.handlePatternClick(target.closest('.pattern-btn'));
+            } else if (target.closest('.memory-btn')) {
+                this.handleMemoryClick(target.closest('.memory-btn'));
+            } else if (target.closest('.save-btn')) {
+                this.handleSaveClick(target.closest('.save-btn'));
+            }
+        };
+
+        this.container.addEventListener('click', handleEvent);
+        this.container.addEventListener('touchstart', handleEvent, { passive: true });
+    }
+
+    debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    handleEvent = (e) => {
+        requestIdleCallback(() => {
+            const target = e.target;
+            if (target.closest('.drum-cell')) {
+                this.handleCellClick(target.closest('.drum-cell'));
+            } else if (target.closest('.pattern-btn')) {
+                this.handlePatternClick(target.closest('.pattern-btn'));
+            }
+            // ... altri handler
+        });
+    };
+
+    handleCellClick(cell) {
+        const drum = cell.parentElement.dataset.drum;
+        const step = parseInt(cell.dataset.step);
+
+        if (!cell.classList.contains('active')) {
+            cell.classList.add('active');
+            this.sequenceChangeCallback?.(drum, step, true, 1);
+        } else if (!cell.classList.contains('accent')) {
+            cell.classList.add('accent');
+            this.sequenceChangeCallback?.(drum, step, true, 1.5);
+        } else {
+            cell.classList.remove('active', 'accent');
+            this.sequenceChangeCallback?.(drum, step, false, 0);
+        }
+    }
+
+    handlePatternClick(patternBtn) {
+        const type = patternBtn.dataset.pattern;
+        requestAnimationFrame(() => {
+            switch(type) {
+                case 'basic':
+                    this.generateBasicPattern();
+                    break;
+                case 'house':
+                    this.generateHousePattern();
+                    break;
+                case 'break':
+                    this.generateBreakPattern();
+                    break;
+            }
+            patternBtn.classList.add('active');
+            setTimeout(() => patternBtn.classList.remove('active'), 200);
+        });
+    }
+
+    handleMemoryClick(memoryBtn) {
+        if (!memoryBtn || this.isSaving) return;
+
+        requestAnimationFrame(() => {
+            if (this.isSaveMode) {
+                this.handleSaveMode(memoryBtn);
+            } else {
+                this.handleLoadMode(memoryBtn);
+            }
+        });
+    }
+
+    handleSaveClick(saveBtn) {
+        if (this.isSaving) return;
+        
+        requestAnimationFrame(() => {
             this.isSaveMode = !this.isSaveMode;
             this.container.querySelectorAll('.memory-btn').forEach(btn => {
                 btn.classList.toggle('saving', this.isSaveMode);
             });
+        });
+    }
+
+    handleSaveMode(btn) {
+        this.isSaving = true;
+        this.savePattern(btn.dataset.slot);
+        this.isSaveMode = false;
+        
+        requestAnimationFrame(() => {
+            this.container.querySelectorAll('.memory-btn').forEach(b => b.classList.remove('saving'));
+            btn.classList.add('saved');
+            setTimeout(() => {
+                btn.classList.remove('saved');
+                this.isSaving = false;
+            }, 300);
+        });
+    }
+
+    handleLoadMode(btn) {
+        this.loadPattern(btn.dataset.slot);
+        requestAnimationFrame(() => {
+            this.container.querySelectorAll('.memory-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
         });
     }
 
@@ -257,7 +375,7 @@ export class DrumMachineRender extends AbstractHTMLRender {
                     const cell = row.querySelector(`[data-step="${index}"]`);
                     const isActive = Boolean(value);
                     cell.classList.toggle('active', isActive);
-                    this.sequenceChangeCallback?.(drum, index, isActive);
+                    this.sequenceChangeCallback?.(drum, index, isActive, isActive ? 1 : 0);
                 });
             }
         });
@@ -267,9 +385,11 @@ export class DrumMachineRender extends AbstractHTMLRender {
         const pattern = {};
         this.container.querySelectorAll('.drum-row').forEach(row => {
             const drum = row.dataset.drum;
-            pattern[drum] = Array.from(row.querySelectorAll('.drum-cell')).map(cell => 
-                cell.classList.contains('active') ? 1 : 0
-            );
+            pattern[drum] = Array.from(row.querySelectorAll('.drum-cell')).map(cell => {
+                if (cell.classList.contains('accent')) return 2;
+                if (cell.classList.contains('active')) return 1;
+                return 0;
+            });
         });
         localStorage.setItem(`drum-pattern-${slot}`, JSON.stringify(pattern));
     }
@@ -286,17 +406,23 @@ export class DrumMachineRender extends AbstractHTMLRender {
             if (row) {
                 steps.forEach((value, index) => {
                     const cell = row.querySelector(`[data-step="${index}"]`);
-                    const isActive = Boolean(value);
-                    cell.classList.toggle('active', isActive);
-                    updates.push([drum, index, isActive]);
+                    cell.classList.remove('active', 'accent');
+                    if (value === 2) {
+                        cell.classList.add('active', 'accent');
+                        updates.push([drum, index, true, 1.5]);
+                    } else if (value === 1) {
+                        cell.classList.add('active');
+                        updates.push([drum, index, true, 1]);
+                    } else {
+                        updates.push([drum, index, false, 0]);
+                    }
                 });
             }
         });
 
-        // Batch update
         requestAnimationFrame(() => {
-            updates.forEach(([drum, index, isActive]) => {
-                this.sequenceChangeCallback?.(drum, index, isActive);
+            updates.forEach(([drum, index, active, velocity]) => {
+                this.sequenceChangeCallback?.(drum, index, active, velocity);
             });
         });
     }

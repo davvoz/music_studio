@@ -1,8 +1,8 @@
 import { AbstractHTMLRender } from './AbstractHTMLRender.js';
 import { AbstractAudioComponent } from './AbstractAudioComponent.js';
 import { VUMeter } from '../../components/VUMeter.js';
-// Rimuovere import PatternGrid
-// import { PatternGrid } from '../../components/PatternGrid.js';
+import { DelayEffect } from '../effects/DelayEffect.js';
+import { ShaperEffect } from '../effects/ShaperEffect.js';
 
 export class AbstractInstrument extends AbstractAudioComponent {
     constructor(context, id) {
@@ -15,11 +15,17 @@ export class AbstractInstrument extends AbstractAudioComponent {
         this.rackVolume = context.createGain();
         this.vuMeter = new VUMeter(context);
         
-        // Set initial volume
+        // Create effects
+        this.delay = new DelayEffect(context);
+        this.shaper = new ShaperEffect(context);
+        
+        // Set initial values
         this.rackVolume.gain.value = 0.8;
         
-        // Connect the audio chain
-        this.instrumentOutput.connect(this.rackVolume);
+        // Connect the audio chain with effects
+        this.instrumentOutput.connect(this.shaper.input);
+        this.shaper.connect(this.delay.input);
+        this.delay.connect(this.rackVolume);
         this.rackVolume.connect(this.output);
         
         // Connect VU meter in parallel
@@ -36,6 +42,7 @@ export class AbstractInstrument extends AbstractAudioComponent {
         const mixerSection = document.createElement('div');
         mixerSection.className = 'rack-mixer';
         
+        // Volume controls
         const volumeKnob = document.createElement('input');
         volumeKnob.type = 'range';
         volumeKnob.min = 0;
@@ -52,8 +59,14 @@ export class AbstractInstrument extends AbstractAudioComponent {
         
         mixerSection.appendChild(volumeKnob);
         mixerSection.appendChild(this.vuMeter.getElement());
+        
+        // Add effects controls
+        const shaperControls = this.shaper.renderer.render();
+        const delayControls = this.delay.renderer.render();
+        mixerSection.appendChild(shaperControls);
+        mixerSection.appendChild(delayControls);
+        
         container.appendChild(mixerSection);
-
         return container;
     }
 
