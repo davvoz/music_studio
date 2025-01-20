@@ -1,0 +1,281 @@
+import { AbstractHTMLRender } from "../../abstract/AbstractHTMLRender.js";
+import { Knob } from "../../../components/Knob.js";
+
+export class SamplerRender extends AbstractHTMLRender {
+    constructor() {
+        super();
+        this.container.classList.add('sampler');
+        this.paramChangeCallback = null;
+        this.setupUI();
+    }
+
+    setParameterChangeCallback(callback) {
+        this.paramChangeCallback = callback;
+    }
+
+    updateSampleInfo(filename) {
+        const sampleInfo = this.container.querySelector('.sample-info');
+        if (sampleInfo) {
+            sampleInfo.textContent = filename;
+            sampleInfo.style.color = '#00ff9d'; // Change color to indicate success
+        }
+    }
+
+    setupUI() {
+        this.container.innerHTML = `
+            <div class="sampler-container">
+                <div class="sampler-header">
+                    <div class="sample-loader">
+                        <button class="load-sample-btn">Load Sample</button>
+                        <input type="file" accept="audio/*" style="display: none;">
+                        <span class="sample-info">No sample loaded</span>
+                    </div>
+                    <div class="pattern-controls">
+                        <div class="pattern-types">
+                            <button class="pattern-type-btn" data-type="random">RND</button>
+                            <button class="pattern-type-btn" data-type="minor">MIN</button>
+                            <button class="pattern-type-btn" data-type="major">MAJ</button>
+                            <button class="pattern-type-btn" data-type="perc">PRC</button>
+                        </div>
+                        <div class="pattern-length">
+                            <button class="length-btn" data-length="4">4</button>
+                            <button class="length-btn" data-length="8">8</button>
+                            <button class="length-btn" data-length="16">16</button>
+                            <button class="length-btn active" data-length="32">32</button>
+                        </div>
+                        <div class="pattern-buttons">
+                            ${Array(8).fill().map((_, i) => 
+                                `<button class="pattern-btn" data-pattern="${i + 1}">${i + 1}</button>`
+                            ).join('')}
+                        </div>
+                        <button class="save-pattern">SAVE</button>
+                    </div>
+                </div>
+                <div class="sequence-grido"></div>
+            </div>
+        `;
+
+        this.createSequencer();
+        this.setupEventListeners();
+    }
+
+    setupEventListeners() {
+        // Sample loading
+        const loadBtn = this.container.querySelector('.load-sample-btn');
+        const fileInput = this.container.querySelector('input[type="file"]');
+
+        loadBtn.addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                this.paramChangeCallback?.('loadSample', file);
+                this.updateSampleInfo(file.name);
+            }
+        });
+
+        // Other control listeners
+        this.container.querySelectorAll('select').forEach(select => {
+            select.addEventListener('change', (e) => {
+                const param = e.target.classList[0].replace('-select', '');
+                this.paramChangeCallback?.(param, e.target.value);
+            });
+        });
+
+        // Pattern controls
+        let saveMode = false;
+        const saveBtn = this.container.querySelector('.save-pattern');
+        const patternBtns = this.container.querySelectorAll('.pattern-btn');
+
+        saveBtn.addEventListener('click', () => {
+            saveMode = !saveMode;
+            saveBtn.classList.toggle('active', saveMode);
+            this.container.classList.toggle('save-mode', saveMode);
+        });
+
+        patternBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const patternNum = parseInt(btn.dataset.pattern);
+                if (saveMode) {
+                    this.paramChangeCallback?.('savePattern', patternNum);
+                    saveMode = false;
+                    saveBtn.classList.remove('active');
+                    this.container.classList.remove('save-mode');
+                    
+                    // Visual feedback
+                    btn.classList.add('saved');
+                    setTimeout(() => btn.classList.remove('saved'), 200);
+                } else {
+                    this.paramChangeCallback?.('loadPattern', patternNum);
+                    patternBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                }
+            });
+        });
+
+        // Pattern type buttons
+        this.container.querySelectorAll('.pattern-type-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const type = btn.dataset.type;
+                this.paramChangeCallback?.('generatePattern', type);
+                
+                // Visual feedback
+                btn.classList.add('active');
+                setTimeout(() => btn.classList.remove('active'), 200);
+            });
+        });
+
+        // Pattern length buttons handler - come nella TB303
+        let selectedLength = 16; // Default pattern length
+        this.container.querySelectorAll('.length-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const length = parseInt(btn.dataset.length);
+                selectedLength = length;
+                this.container.querySelectorAll('.length-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                
+                // Genera un nuovo pattern quando cambia la lunghezza
+                this.paramChangeCallback?.('patternLength', length);
+            });
+        });
+    }
+
+    createSequencer() {
+        const grid = this.container.querySelector('.sequence-grido');
+        const row = document.createElement('div');
+        row.className = 'sequence-row';
+
+        for (let step = 0; step < 32; step++) {
+            const cell = document.createElement('div');
+            cell.className = 'sequence-cell';
+            cell.dataset.step = step;
+            
+            if (step % 8 === 0) cell.classList.add('bar-start');
+            if (step % 4 === 0) cell.classList.add('beat-start');
+
+            cell.innerHTML = `
+                <div class="step-controls">
+                    <button class="step-toggle">ON</button>
+                    <select class="pitch-select">
+                        ${Array.from({length: 25}, (_, i) => i - 12)
+                            .map(v => `<option value="${v}">${v > 0 ? '+' + v : v}</option>`)
+                            .join('')}
+                    </select>
+                    <input type="range" class="velocity-slider" min="0" max="1" step="0.1" value="0.8">
+                    <label>VEL</label>
+                    <input type="range" class="length-slider" min="0" max="1" step="0.001" value="0.25">
+                    <label>LEN</label>
+                    <label for="start-slider" data-value="0%">START</label>
+                    <input type="range" class="start-slider" min="0" max="1" step="0.001" value="0">
+                </div>
+            `;
+
+            this.setupStepEvents(cell, step);
+            row.appendChild(cell);
+        }
+
+        grid.appendChild(row);
+    }
+
+    setupStepEvents(cell, step) {
+        const toggleBtn = cell.querySelector('.step-toggle');
+        const velocitySlider = cell.querySelector('.velocity-slider');
+        const lengthSlider = cell.querySelector('.length-slider');
+        const pitchSelect = cell.querySelector('.pitch-select');
+        const startSlider = cell.querySelector('.start-slider');
+
+        // Toggle button handler
+        toggleBtn.addEventListener('click', () => {
+            const isActive = cell.classList.toggle('active');
+            toggleBtn.textContent = isActive ? 'ON' : 'OFF';
+            toggleBtn.classList.toggle('active', isActive);
+            this.updateStep(cell, step);
+        });
+
+        // Control change handlers
+        [velocitySlider, lengthSlider, pitchSelect, startSlider].forEach(control => {
+            control.addEventListener('change', () => {
+                // Update only if step is active
+                if (cell.classList.contains('active')) {
+                    this.updateStep(cell, step);
+                }
+            });
+        });
+
+        // Aggiungi l'event listener per l'input continuo dello slider
+        startSlider.addEventListener('input', () => {
+            const value = Math.round(startSlider.value * 100);
+            const label = cell.querySelector('label[for="start-slider"]');
+            label.setAttribute('data-value', `${value}%`);
+            
+            // Aggiorna in tempo reale se lo step è attivo
+            if (cell.classList.contains('active')) {
+                this.updateStep(cell, step);
+            }
+        });
+    }
+
+    toggleStep(cell, step) {
+        const isActive = cell.classList.toggle('active');
+        console.log('Toggle step:', { step, isActive }); // Debug
+        this.updateStep(cell, step);
+    }
+
+    updateStep(cell, step) {
+        const controls = cell.querySelector('.step-controls');
+        const rawLengthValue = parseFloat(controls.querySelector('.length-slider').value);
+        
+        // Modifica la scala logaritmica per la lunghezza
+        const minLen = 0.01;  // Lunghezza minima 1%
+        const maxLen = 4;     // Lunghezza massima 400%
+        const lengthValue = Math.exp(Math.log(minLen) + (Math.log(maxLen) - Math.log(minLen)) * rawLengthValue);
+        
+        const data = {
+            step,
+            active: cell.classList.contains('active'),
+            velocity: parseFloat(controls.querySelector('.velocity-slider').value),
+            length: Math.round(lengthValue * 1000) / 1000, // 3 decimali di precisione
+            pitch: parseInt(controls.querySelector('.pitch-select').value),
+            startOffset: parseFloat(controls.querySelector('.start-slider').value)
+        };
+        
+        console.log('Step update data:', { ...data, rawLength: rawLengthValue });
+        this.paramChangeCallback?.('updateSequence', data);
+    }
+
+    highlightStep(step) {
+        this.container.querySelectorAll('.sequence-cell').forEach(cell => {
+            cell.classList.remove('playing');
+        });
+        const currentCell = this.container.querySelector(`[data-step="${step}"]`);
+        if (currentCell) currentCell.classList.add('playing');
+    }
+
+    updateSequenceUI(sequence) {
+        const steps = this.container.querySelectorAll('.sequence-cell');
+        sequence.forEach((step, i) => {
+            const cell = steps[i];
+            if (cell) {
+                cell.classList.toggle('active', step.active);
+                const controls = cell.querySelector('.step-controls');
+                if (controls) {
+                    controls.querySelector('.pitch-select').value = step.pitch;
+                    controls.querySelector('.velocity-slider').value = step.velocity;
+                    controls.querySelector('.length-slider').value = step.length;
+                    controls.querySelector('.start-slider').value = step.startOffset;
+                    const toggleBtn = controls.querySelector('.step-toggle');
+                    toggleBtn.textContent = step.active ? 'ON' : 'OFF';
+                    toggleBtn.classList.toggle('active', step.active);
+                }
+            }
+        });
+    }
+
+    updatePatternLength(length) {
+        // Aggiorna visivamente gli step in base alla lunghezza del pattern
+        const cells = this.container.querySelectorAll('.sequence-cell');
+        cells.forEach((cell, index) => {
+            cell.classList.toggle('pattern-inactive', index >= length);
+        });
+    }
+}

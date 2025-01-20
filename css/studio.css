@@ -1,0 +1,78 @@
+.instrument-container {
+    position: relative;
+    background: var(--primary-bg);
+    border-radius: 10px;
+    margin: 10px;
+    transition: all 0.3s ease;
+    transform: translateZ(0);
+    will-change: transform;
+    transition: transform 0.2s ease-out;
+}
+
+.instrument-header {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    background: var(--secondary-bg);
+    border-radius: 10px;  /* Cambiato per apparire meglio quando collassato */
+    cursor: pointer;
+}
+
+.instrument-header h3 {
+    margin: 0;
+    flex-grow: 1;
+    color: var(--accent-color);
+}
+
+.instrument-panel {
+    overflow: hidden;
+    transition: all 0.3s ease;
+    opacity: 1;
+    transform-origin: top;
+    transform: scaleY(1);
+    transform: translateZ(0);
+    will-change: transform;
+    transition: transform 0.2s ease-out;
+}
+
+.instrument-container.collapsed .instrument-panel {
+    transform: scaleY(0);
+    opacity: 0;
+    height: 0;
+    margin: 0;
+    padding: 0;
+}
+
+.instrument-container.collapsed .instrument-header {
+    border-radius: 10px;
+}
+
+.collapse-btn {
+    background: none;
+    border: none;
+    color: var(--accent-color);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 0 10px;
+    transform: rotate(180deg);
+    transition: transform 0.3s ease;
+}
+
+.instrument-container.collapsed .collapse-btn {
+    transform: rotate(0deg);
+}
+
+.remove-instrument {
+    margin-left: 10px;
+}
+
+/* Optimize scrolling */
+body {
+    overflow-y: scroll;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent layout shifts */
+.studio-container {
+    contain: layout style;
+}

@@ -6,6 +6,14 @@ export class TB303 extends AbstractInstrument {
         super(context);
         this.renderer = new TB303Render();
         
+        // Inizializza la sequenza con 32 step vuoti
+        this.sequence = Array(32).fill().map(() => ({
+            note: null,
+            accent: false,
+            slide: false,
+            gate: false
+        }));
+        
         // Inizializza prima i parametri
         this.parameters = {
             cutoff: 0.5,
@@ -13,12 +21,10 @@ export class TB303 extends AbstractInstrument {
             decay: 0.2,
             envMod: 0.5,
             distortion: 0.3,
-            slideTime: 0.055
+            slideTime: 0.055,
+            minDecayTime: 0.03,  // Tempo minimo di decay
+            maxDecayTime: 0.8    // Tempo massimo di decay
         };
-        
-        this.sequence = Array(16).fill().map(() => ({
-            note: null, accent: false, slide: false
-        }));
         
         // Variabili di stato
         this.currentNoteTime = 0;
@@ -80,71 +86,25 @@ export class TB303 extends AbstractInstrument {
     }
 
     onBeat(beat, time) {
-        const { note, accent, slide } = this.sequence[beat];
-        if (!note) return;
+        // Use the entire sequence length
+        const stepIndex = beat % this.sequence.length;
+        const step = this.sequence[stepIndex];
+        if (!step) return;
 
-        // Notifica al renderer quale step sta suonando
-        this.renderer.highlightStep?.(beat);
-
-        const freq = this.getNoteFrequency(note);
-        this.currentNoteTime = time;
-        
-        // Clear scheduled values
-        this.clearScheduledValues(time);
-        
-        // TB-303 timing constants
-        const attackTime = accent ? 0.001 : 0.003;
-        const currentDecayTime = this.decayTime || 0.2; // Fix: use class property
-        const releaseTime = 0.05;
-        const totalTime = attackTime + currentDecayTime + releaseTime;
-        
-        // Frequency handling
-        if (slide && this.lastNoteFrequency) {
-            this.osc.frequency.linearRampToValueAtTime(freq, time + this.slideTime);
-        } else {
-            this.osc.frequency.setValueAtTime(freq, time);
-        }
-        this.lastNoteFrequency = freq;
-
-        // VCA envelope
-        const peakGain = accent ? 0.9 : 0.7;
-        this.vca.gain.setValueAtTime(0, time);
-        this.vca.gain.linearRampToValueAtTime(peakGain, time + attackTime);
-        
-        if (!slide) {
-            this.vca.gain.linearRampToValueAtTime(0.0001, time + attackTime + currentDecayTime);
-            this.vca.gain.linearRampToValueAtTime(0, time + totalTime);
-        }
-
-        // Fixed Filter envelope
-        const baseFreq = this.calculateCutoffFrequency(this.parameters.cutoff);
-        const envAmount = this.parameters.envMod * (accent ? 2.5 : 1);
-        const peakFreq = Math.min(baseFreq * Math.pow(4, envAmount), 20000);
-        
-        this.filter.frequency.setValueAtTime(baseFreq, time);
-        this.filter.frequency.linearRampToValueAtTime(peakFreq, time + attackTime);
-        
-        if (!slide) {
-            // Fast attack, exponential-like decay using multiple linear ramps
-            const decayPoints = 4;
+        const { note, accent, slide } = step;
+        if (note) {
+            this.playNote(note, time, accent, slide);
+            // Programmiamo lo stop della nota
+            const gateTime = 0.1; // 100ms di durata della nota
+            const releaseTime = time + gateTime;
             
-            for (let i = 1; i <= decayPoints; i++) {
-                const decayAmount = (peakFreq - baseFreq) * Math.pow(0.2, i);
-                const decayTime = time + attackTime + (currentDecayTime * (i / decayPoints));
-                this.filter.frequency.linearRampToValueAtTime(
-                    baseFreq + decayAmount,
-                    decayTime
-                );
-            }
-            
-            // Ensure we return to base frequency
-            this.filter.frequency.linearRampToValueAtTime(baseFreq, time + totalTime);
+            this.vca.gain.setValueAtTime(0, releaseTime);
+            this.filter.frequency.setValueAtTime(this.calculateCutoffFrequency(this.parameters.cutoff), releaseTime);
         }
 
-        // Accent handling
-        const accentLevel = accent ? 1.3 : 1.0;
-        this.accentGain.gain.setValueAtTime(accentLevel, time);
-        this.accentGain.gain.setValueAtTime(1.0, time + currentDecayTime);
+        requestAnimationFrame(() => {
+            this.renderer.highlightStep?.(stepIndex);
+        });
     }
 
     clearScheduledValues(time) {
@@ -192,7 +152,9 @@ export class TB303 extends AbstractInstrument {
                     this.filter.Q.value = value * 30;
                     break;
                 case 'decay':
-                    this.decayTime = value * 0.5 + 0.1;
+                    // Scala logaritmica per il decay
+                    this.decayTime = this.parameters.minDecayTime + 
+                        Math.pow(value, 2) * (this.parameters.maxDecayTime - this.parameters.minDecayTime);
                     break;
                 case 'envMod':
                     this.envModAmount = value * 2;
@@ -250,10 +212,63 @@ export class TB303 extends AbstractInstrument {
             this.envModAmount = p.envMod;
             this.envelope.decay = p.decay;
             this.accentAmount = p.accent;
-            // ... imposta altri parametri
             
             // Aggiorna UI
             this.updateUI();
         }
+    }
+
+    playNote(note, time, accent = false, slide = false) {
+        const freq = this.getNoteFrequency(note);
+        const baseTime = time || this.context.currentTime;
+        
+        // Reset scheduled values if not sliding
+        if (!slide) {
+            this.clearScheduledValues(baseTime);
+        }
+    
+        // Set oscillator frequency
+        if (slide && this.lastNoteFrequency) {
+            this.osc.frequency.linearRampToValueAtTime(freq, baseTime + this.slideTime);
+        } else {
+            this.osc.frequency.setValueAtTime(freq, baseTime);
+        }
+    
+        // Store current frequency for next note's slide
+        this.lastNoteFrequency = freq;
+    
+        // Calcoli migliorati per l'envelope
+        const accentMod = accent ? 2 : 1;
+        const envAmount = this.envModAmount * accentMod;
+        
+        // Decay time calculation migliorato
+        const baseDecayTime = this.decayTime;
+        const accentedDecayTime = accent ? baseDecayTime * 1.2 : baseDecayTime;
+        const finalDecayTime = Math.max(this.parameters.minDecayTime, 
+                                      Math.min(accentedDecayTime, this.parameters.maxDecayTime));
+        
+        // Attack più rapido
+        const attackTime = 0.003;
+        
+        // Amplitude envelope migliorato
+        this.vca.gain.cancelScheduledValues(baseTime);
+        this.vca.gain.setValueAtTime(0, baseTime);
+        this.vca.gain.linearRampToValueAtTime(0.8 * accentMod, baseTime + attackTime);
+        
+        // Decay con curva esponenziale più naturale
+        this.vca.gain.setTargetAtTime(0.0001, baseTime + attackTime, finalDecayTime / 3);
+    
+        // Filter envelope migliorato
+        const baseFreq = this.calculateCutoffFrequency(this.parameters.cutoff);
+        const maxFreq = Math.min(baseFreq * (1 + envAmount * 4), 20000);
+        
+        this.filter.frequency.cancelScheduledValues(baseTime);
+        this.filter.frequency.setValueAtTime(baseFreq, baseTime);
+        this.filter.frequency.linearRampToValueAtTime(maxFreq, baseTime + attackTime);
+        this.filter.frequency.setTargetAtTime(baseFreq, baseTime + attackTime, finalDecayTime / 4);
+        
+        // Accent gain con transizione più morbida
+        const accentGainValue = accent ? 1.4 : 1;
+        this.accentGain.gain.setTargetAtTime(accentGainValue, baseTime, 0.005);
     }
 }

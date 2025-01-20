@@ -33,10 +33,18 @@ export class TB303Render extends AbstractHTMLRender {
                     <span>WAVE</span>
                 </div>
                 <div class="knob-wrap pattern-selector">
-                    <div class="pattern-buttons">
-                        <button class="pattern-btn" data-pattern="random">RND</button>
-                        <button class="pattern-btn" data-pattern="minor">MIN</button>
-                        <button class="pattern-btn" data-pattern="major">MAJ</button>
+                    <div class="pattern-buttonsi">
+                        <div class="pattern-type">
+                            <button class="pattern-btn" data-pattern="random">RND</button>
+                            <button class="pattern-btn" data-pattern="minor">MIN</button>
+                            <button class="pattern-btn" data-pattern="major">MAJ</button>
+                        </div>
+                        <div class="pattern-length">
+                            <button class="length-btn" data-length="4">4</button>
+                            <button class="length-btn" data-length="8">8</button>
+                            <button class="length-btn" data-length="16">16</button>
+                            <button class="length-btn" data-length="32">32</button>
+                        </div>
                     </div>
                     <div class="pattern-memory">
                         <button class="memory-btn" data-slot="1">1</button>
@@ -70,6 +78,7 @@ export class TB303Render extends AbstractHTMLRender {
 
         this.createCompactSequencer();
         this.setupEventListeners();
+        this.addCopyPasteControls(this.container.querySelector('.tb303-sequence'));
     }
 
     createKnob(param, label, container) {
@@ -108,7 +117,8 @@ export class TB303Render extends AbstractHTMLRender {
 
     createCompactSequencer() {
         const seq = this.container.querySelector('.tb303-sequence');
-        const steps = Array(16).fill().map(() => {
+        // Modifica da 16 a 32 step
+        const steps = Array(32).fill().map(() => {
             const step = document.createElement('div');
             step.className = 'step';
             step.innerHTML = `
@@ -217,6 +227,39 @@ export class TB303Render extends AbstractHTMLRender {
                 btn.classList.toggle('saving', this.isSaveMode);
             });
         });
+
+        // Gestione dei pattern length buttons
+        let selectedLength = 16; // Default pattern length
+        this.container.querySelectorAll('.length-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.container.querySelectorAll('.length-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                selectedLength = parseInt(btn.dataset.length);
+            });
+        });
+
+        // Modifica della gestione dei pattern buttons
+        this.container.querySelectorAll('.pattern-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const type = btn.dataset.pattern;
+                switch(type) {
+                    case 'random':
+                        this.generateRandomPattern(selectedLength);
+                        break;
+                    case 'minor':
+                        this.generateRandomMinorPattern(selectedLength);
+                        break;
+                    case 'major':
+                        this.generateRandomMajorPattern(selectedLength);
+                        break;
+                }
+                btn.classList.add('active');
+                setTimeout(() => btn.classList.remove('active'), 200);
+            });
+        });
+
+        // Attiva il bottone 16 di default
+        this.container.querySelector('.length-btn[data-length="16"]').classList.add('active');
     }
 
     getStepData(step) {
@@ -227,36 +270,42 @@ export class TB303Render extends AbstractHTMLRender {
         };
     }
 
-    generateRandomPattern() {
+    generateRandomPattern(length = 16) {
+        this.clearAllSteps();
         const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
         const octaves = ['1', '2'];
         
-        this.container.querySelectorAll('.step').forEach((step, index) => {
-            // 70% chance of having a note
+        // Prima genera il pattern base della lunghezza richiesta
+        const basePattern = [];
+        for (let i = 0; i < length; i++) {
             if (Math.random() < 0.7) {
-                const note = notes[Math.floor(Math.random() * notes.length)];
-                const octave = octaves[Math.floor(Math.random() * octaves.length)];
-                step.querySelector('.note').value = note + octave;
-                
-                // 30% chance of accent
-                const accent = Math.random() < 0.3;
-                step.querySelector('[data-type="accent"]').classList.toggle('active', accent);
-                
-                // 20% chance of slide if there's a next note
-                const slide = Math.random() < 0.2;
-                step.querySelector('[data-type="slide"]').classList.toggle('active', slide);
+                basePattern.push({
+                    note: notes[Math.floor(Math.random() * notes.length)] + 
+                          octaves[Math.floor(Math.random() * octaves.length)],
+                    accent: Math.random() < 0.3,
+                    slide: Math.random() < 0.2
+                });
             } else {
-                step.querySelector('.note').value = '';
-                step.querySelector('[data-type="accent"]').classList.remove('active');
-                step.querySelector('[data-type="slide"]').classList.remove('active');
+                basePattern.push({ note: '', accent: false, slide: false });
             }
+        }
+
+        // Poi applica il pattern ripetendolo per tutti i 32 step
+        const steps = this.container.querySelectorAll('.step');
+        for (let i = 0; i < 32; i++) {
+            const patternStep = basePattern[i % length];
+            const step = steps[i];
             
-            // Notify sequence change
-            this.sequenceChangeCallback?.(index, this.getStepData(step));
-        });
+            step.querySelector('.note').value = patternStep.note;
+            step.querySelector('[data-type="accent"]').classList.toggle('active', patternStep.accent);
+            step.querySelector('[data-type="slide"]').classList.toggle('active', patternStep.slide);
+            
+            this.sequenceChangeCallback?.(i, this.getStepData(step));
+        }
     }
 
-    generateRandomMinorPattern() {
+    generateRandomMinorPattern(length = 16) {
+        this.clearAllSteps();
         // Natural minor scale (Aeolian mode): W-H-W-W-H-W-W
         // Relative to C: C, D, Eb, F, G, Ab, Bb
         const minorScaleNotes = {
@@ -274,34 +323,42 @@ export class TB303Render extends AbstractHTMLRender {
             'B': ['B', 'C#', 'D', 'E', 'F#', 'G', 'A']
         };
 
-        // Scegli una tonica casuale
         const roots = Object.keys(minorScaleNotes);
         const root = roots[Math.floor(Math.random() * roots.length)];
         const scale = minorScaleNotes[root];
         const octaves = ['1', '2'];
         
-        this.container.querySelectorAll('.step').forEach((step, index) => {
-            if (Math.random() < 0.7) { // 70% chance of having a note
-                const note = scale[Math.floor(Math.random() * scale.length)];
-                const octave = octaves[Math.floor(Math.random() * octaves.length)];
-                step.querySelector('.note').value = note + octave;
-                
-                const accent = Math.random() < 0.3;
-                step.querySelector('[data-type="accent"]').classList.toggle('active', accent);
-                
-                const slide = Math.random() < 0.2;
-                step.querySelector('[data-type="slide"]').classList.toggle('active', slide);
+        // Genera il pattern base
+        const basePattern = [];
+        for (let i = 0; i < length; i++) {
+            if (Math.random() < 0.7) {
+                basePattern.push({
+                    note: scale[Math.floor(Math.random() * scale.length)] + 
+                          octaves[Math.floor(Math.random() * octaves.length)],
+                    accent: Math.random() < 0.3,
+                    slide: Math.random() < 0.2
+                });
             } else {
-                step.querySelector('.note').value = '';
-                step.querySelector('[data-type="accent"]').classList.remove('active');
-                step.querySelector('[data-type="slide"]').classList.remove('active');
+                basePattern.push({ note: '', accent: false, slide: false });
             }
+        }
+
+        // Applica il pattern in loop
+        const steps = this.container.querySelectorAll('.step');
+        for (let i = 0; i < 32; i++) {
+            const patternStep = basePattern[i % length];
+            const step = steps[i];
             
-            this.sequenceChangeCallback?.(index, this.getStepData(step));
-        });
+            step.querySelector('.note').value = patternStep.note;
+            step.querySelector('[data-type="accent"]').classList.toggle('active', patternStep.accent);
+            step.querySelector('[data-type="slide"]').classList.toggle('active', patternStep.slide);
+            
+            this.sequenceChangeCallback?.(i, this.getStepData(step));
+        }
     }
 
-    generateRandomMajorPattern() {
+    generateRandomMajorPattern(length = 16) {
+        this.clearAllSteps();
         // Major scale: W-W-H-W-W-W-H
         const majorScaleNotes = {
             'C': ['C', 'D', 'E', 'F', 'G', 'A', 'B'],
@@ -318,31 +375,45 @@ export class TB303Render extends AbstractHTMLRender {
             'B': ['B', 'C#', 'D#', 'E', 'F#', 'G#', 'A#']
         };
 
-        // Scegli una tonica casuale
         const roots = Object.keys(majorScaleNotes);
         const root = roots[Math.floor(Math.random() * roots.length)];
         const scale = majorScaleNotes[root];
         const octaves = ['1', '2'];
         
-        this.container.querySelectorAll('.step').forEach((step, index) => {
-            if (Math.random() < 0.7) { // 70% chance of having a note
-                const note = scale[Math.floor(Math.random() * scale.length)];
-                const octave = octaves[Math.floor(Math.random() * octaves.length)];
-                step.querySelector('.note').value = note + octave;
-                
-                // Maggiore probabilità di accenti sui tempi forti (1, 5, 9, 13)
-                const accent = (index % 4 === 0) ? Math.random() < 0.5 : Math.random() < 0.2;
-                step.querySelector('[data-type="accent"]').classList.toggle('active', accent);
-                
-                // Slide più probabili tra note vicine
-                const slide = Math.random() < 0.15; // Leggermente meno slide per un feel più "maggiore"
-                step.querySelector('[data-type="slide"]').classList.toggle('active', slide);
+        // Genera il pattern base
+        const basePattern = [];
+        for (let i = 0; i < length; i++) {
+            if (Math.random() < 0.7) {
+                basePattern.push({
+                    note: scale[Math.floor(Math.random() * scale.length)] + 
+                          octaves[Math.floor(Math.random() * octaves.length)],
+                    accent: (i % 4 === 0) ? Math.random() < 0.5 : Math.random() < 0.2,
+                    slide: Math.random() < 0.15
+                });
             } else {
-                step.querySelector('.note').value = '';
-                step.querySelector('[data-type="accent"]').classList.remove('active');
-                step.querySelector('[data-type="slide"]').classList.remove('active');
+                basePattern.push({ note: '', accent: false, slide: false });
             }
+        }
+
+        // Applica il pattern in loop
+        const steps = this.container.querySelectorAll('.step');
+        for (let i = 0; i < 32; i++) {
+            const patternStep = basePattern[i % length];
+            const step = steps[i];
             
+            step.querySelector('.note').value = patternStep.note;
+            step.querySelector('[data-type="accent"]').classList.toggle('active', patternStep.accent);
+            step.querySelector('[data-type="slide"]').classList.toggle('active', patternStep.slide);
+            
+            this.sequenceChangeCallback?.(i, this.getStepData(step));
+        }
+    }
+
+    clearAllSteps() {
+        this.container.querySelectorAll('.step').forEach((step, index) => {
+            step.querySelector('.note').value = '';
+            step.querySelector('[data-type="accent"]').classList.remove('active');
+            step.querySelector('[data-type="slide"]').classList.remove('active');
             this.sequenceChangeCallback?.(index, this.getStepData(step));
         });
     }
@@ -399,5 +470,27 @@ export class TB303Render extends AbstractHTMLRender {
         if (currentStep) {
             currentStep.classList.add('playing');
         }
+    }
+
+    addCopyPasteControls(container) {
+        // Add your implementation for copy-paste controls here
+    }
+
+    copySteps(start, end) {
+        return Array.from(this.container.querySelectorAll('.step'))
+            .slice(start, end)
+            .map(step => this.getStepData(step));
+    }
+
+    pasteSteps(data, targetStep) {
+        data.forEach((stepData, index) => {
+            const step = this.container.querySelectorAll('.step')[targetStep + index];
+            if (step) {
+                step.querySelector('.note').value = stepData.note;
+                step.querySelector('[data-type="accent"]').classList.toggle('active', stepData.accent);
+                step.querySelector('[data-type="slide"]').classList.toggle('active', stepData.slide);
+                this.sequenceChangeCallback?.(targetStep + index, stepData);
+            }
+        });
     }
 }

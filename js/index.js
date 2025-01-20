@@ -2,6 +2,7 @@ import { AudioEngine } from './core/AudioEngine.js';
 import { RenderEngine } from './core/RenderEngine.js';
 import { TB303 } from './audio-components/instruments/tb303/TB303.js';
 import { DrumMachine } from './audio-components/instruments/drummer/DrumMachine.js';
+import { Sampler } from './audio-components/instruments/sampler/Sampler.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const audioEngine = new AudioEngine();
@@ -17,7 +18,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.appendChild(renderEngine.render());
 
     // Example: Add a MonoSynth
-     
+    //add a sampler
+    const sampler = new Sampler(audioEngine.context);
+    audioEngine.addInstrument('sampler', sampler);
+    renderEngine.addInstrumentUI('sampler', sampler);   
 
     // Add TB-303
     const tb303 = new TB303(audioEngine.context);

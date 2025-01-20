@@ -1,5 +1,7 @@
 import { TB303 } from '../audio-components/instruments/tb303/TB303.js';
 import { DrumMachine } from '../audio-components/instruments/drummer/DrumMachine.js';
+import { Sampler } from '../audio-components/instruments/sampler/Sampler.js';  // Aggiungi questa riga
+
 export class RenderEngine {
     constructor(audioEngine) {
         this.audioEngine = audioEngine;
@@ -11,6 +13,27 @@ export class RenderEngine {
         this.setupTransportSection();
         this.setupInstrumentRack();
         this.setupMixerSection();
+
+        // Setup audio engine beat callback
+        this.audioEngine.onBeatUpdate = (beat) => {
+            // Ensure we're using a 32-step pattern
+            const normalizedBeat = beat % 32;  // Add this line
+            this.updateTransportDisplay(normalizedBeat);
+        };
+
+        // Add performance optimizations
+        this.frameRequest = null;
+        this.lastRenderTime = 0;
+        this.renderInterval = 1000 / 30; // 30 FPS max for UI updates
+
+        // Optimize UI updates
+        this.pendingUIUpdate = false;
+        this.lastUIUpdateTime = 0;
+        this.minUIUpdateInterval = 33; // ~30fps
+
+        // Add debounce utility
+        this.debounceTimeout = null;
+        this.isAnimating = false;
     }
 
     setupTransportSection() {
@@ -68,11 +91,17 @@ export class RenderEngine {
         tempoInput.value = this.audioEngine.tempo / 4; // Dividiamo per 4 il valore visualizzato
         tempoInput.min = '30';
         tempoInput.max = '300';
-        tempoInput.onchange = (e) => {
-            const displayValue = parseInt(e.target.value);
-            const actualTempo = displayValue * 4; // Moltiplichiamo per 4 il valore inserito
-            this.audioEngine.setTempo(actualTempo);
-        };
+        
+        // Use change instead of input event
+        let tempoTimeout;
+        tempoInput.addEventListener('change', (e) => {
+            clearTimeout(tempoTimeout);
+            tempoTimeout = setTimeout(() => {
+                const displayValue = parseInt(e.target.value);
+                const actualTempo = displayValue * 4;
+                this.audioEngine.setTempo(actualTempo);
+            }, 100);
+        }, { passive: true });
 
         // Beat indicators
         const beatDisplay = document.createElement('div');
@@ -112,13 +141,39 @@ export class RenderEngine {
     }
 
     updateBeatIndicators(currentBeat) {
-        this.beatIndicators.forEach((indicator, index) => {
-            indicator.classList.toggle('active', index === currentBeat);
+        if (this.isAnimating) return;
+
+        const now = performance.now();
+        if (now - this.lastUIUpdateTime < this.minUIUpdateInterval || this.pendingUIUpdate) {
+            return;
+        }
+
+        this.pendingUIUpdate = true;
+        this.lastUIUpdateTime = now;
+
+        requestAnimationFrame(() => {
+            this.beatIndicators.forEach((indicator, index) => {
+                indicator.classList.toggle('active', index === currentBeat);
+            });
+            
+            const bar = Math.floor(currentBeat / 4) + 1;
+            const beat = (currentBeat % 4) + 1;
+            this.currentBeatDisplay.textContent = `${bar}.${beat}`;
+            
+            this.pendingUIUpdate = false;
         });
+    }
+
+    updateTransportDisplay(beat) {
+        // Update transport display for 32 steps instead of 16
+        const totalSteps = 32;
+        const currentBar = Math.floor(beat / 8) + 1;
+        const currentBeat = (beat % 8) + 1;
         
-        const bar = Math.floor(currentBeat / 4) + 1;
-        const beat = (currentBeat % 4) + 1;
-        this.currentBeatDisplay.textContent = `${bar}.${beat}`;
+        if (this.transportDisplay) {
+            this.transportDisplay.textContent = 
+                `BAR ${currentBar} : BEAT ${currentBeat}`;
+        }
     }
 
     setupInstrumentRack() {
@@ -161,6 +216,7 @@ export class RenderEngine {
         const instruments = [
             { id: 'tb303', name: 'TB-303', class: TB303 },
             { id: 'drummer', name: 'Drum Machine', class: DrumMachine },
+            { id: 'sampler', name: 'Sampler', class: Sampler }  // Aggiungi questa riga
         ];
         
         const list = document.createElement('div');
@@ -195,14 +251,68 @@ export class RenderEngine {
         instrumentContainer.className = 'instrument-container';
         instrumentContainer.dataset.type = instrumentComponent.constructor.name.toLowerCase();
 
+        // Create header
+        const header = document.createElement('div');
+        header.className = 'instrument-header';
+
+        // Add title
+        const title = document.createElement('h3');
+        title.textContent = instrumentComponent.constructor.name;
+        
+        // Add collapse button with optimized animation
+        const collapseBtn = document.createElement('button');
+        collapseBtn.className = 'collapse-btn';
+        collapseBtn.innerHTML = '▼';
+        
+        // Optimize collapse animation
+        const handleCollapse = (e) => {
+            if (this.isAnimating) return;
+            e.stopPropagation();
+            
+            this.isAnimating = true;
+            const panel = instrumentContainer.querySelector('.instrument-panel');
+            
+            // Use CSS transform instead of height animation
+            requestAnimationFrame(() => {
+                instrumentContainer.classList.toggle('collapsed');
+                collapseBtn.style.transform = 
+                    instrumentContainer.classList.contains('collapsed') 
+                        ? 'rotate(0deg)' 
+                        : 'rotate(180deg)';
+                
+                // Save state after animation is complete
+                clearTimeout(this.debounceTimeout);
+                this.debounceTimeout = setTimeout(() => {
+                    const type = instrumentContainer.dataset.type;
+                    localStorage.setItem(`${type}-${id}-collapsed`, 
+                        instrumentContainer.classList.contains('collapsed'));
+                    this.isAnimating = false;
+                }, 200);
+            });
+        };
+
+        collapseBtn.onclick = handleCollapse;
+        header.onclick = (e) => {
+            if (!this.isAnimating) handleCollapse(e);
+        };
+
         // Add remove button
         const removeBtn = document.createElement('button');
         removeBtn.className = 'remove-instrument';
         removeBtn.textContent = '✕';
-        removeBtn.onclick = () => {
+        removeBtn.onclick = (e) => {
+            e.stopPropagation();
             this.audioEngine.removeInstrument(id);
             instrumentContainer.remove();
         };
+
+        // Assemble header
+        header.appendChild(title);
+        header.appendChild(collapseBtn);
+        header.appendChild(removeBtn);
+
+        // Make entire header clickable for collapse
+        header.onclick = () => collapseBtn.click();
 
         // Instrument panel
         const instrumentPanel = document.createElement('div');
@@ -210,8 +320,16 @@ export class RenderEngine {
         instrumentPanel.appendChild(instrumentComponent.render());
 
         // Assemble the layout
-        instrumentContainer.append(removeBtn, instrumentPanel);
+        instrumentContainer.append(header, instrumentPanel);
         this.instrumentRack.appendChild(instrumentContainer);
+
+        // Restore collapsed state from localStorage
+        const type = instrumentContainer.dataset.type;
+        const isCollapsed = localStorage.getItem(`${type}-${id}-collapsed`) === 'true';
+        if (isCollapsed) {
+            instrumentContainer.classList.add('collapsed');
+            collapseBtn.style.transform = 'rotate(0deg)';
+        }
     }
 
     setupVUMeter(canvas, instrument) {

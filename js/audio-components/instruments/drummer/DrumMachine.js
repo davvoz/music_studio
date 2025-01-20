@@ -14,10 +14,10 @@ export class DrumMachine extends AbstractInstrument {
         };
 
         this.sequence = {
-            kick:  Array(16).fill({ active: false, velocity: 1 }),
-            snare: Array(16).fill({ active: false, velocity: 1 }),
-            hihat: Array(16).fill({ active: false, velocity: 1 }),
-            clap:  Array(16).fill({ active: false, velocity: 1 })
+            kick:  Array(32).fill({ active: false, velocity: 1 }),
+            snare: Array(32).fill({ active: false, velocity: 1 }),
+            hihat: Array(32).fill({ active: false, velocity: 1 }),
+            clap:  Array(32).fill({ active: false, velocity: 1 })
         };
 
         this.parameters = {
@@ -30,6 +30,7 @@ export class DrumMachine extends AbstractInstrument {
 
         this.setupAudio();
         this.setupEvents();
+        this.loadDefaultSamples();
     }
 
     setupAudio() {
@@ -41,9 +42,6 @@ export class DrumMachine extends AbstractInstrument {
     }
 
     setupEvents() {
-        let paramUpdateTimeout = null;
-        let paramQueue = new Map();
-
         this.parameterChangeCallback = async (param, value) => {
             try {
                 if (param === 'loadSample') {
@@ -52,14 +50,12 @@ export class DrumMachine extends AbstractInstrument {
                 }
 
                 this.parameters[param] = value;
-                paramQueue.set(param, value);
-
-                if (!paramUpdateTimeout) {
-                    paramUpdateTimeout = setTimeout(() => {
-                        this.batchUpdateParameters(paramQueue);
-                        paramQueue.clear();
-                        paramUpdateTimeout = null;
-                    }, 16);
+                
+                // Applica i cambiamenti immediatamente
+                if (param.endsWith('Volume')) {
+                    this.updateVolume(param.replace('Volume', ''), value);
+                } else if (param.endsWith('Pitch')) {
+                    this.updatePitch(param.replace('Pitch', ''), value);
                 }
             } catch (error) {
                 console.warn('Parameter change error:', error);
@@ -73,16 +69,6 @@ export class DrumMachine extends AbstractInstrument {
 
         this.renderer.setParameterChangeCallback(this.parameterChangeCallback);
         this.renderer.setSequenceChangeCallback(this.sequenceChangeCallback);
-    }
-
-    batchUpdateParameters(queue) {
-        for (const [param, value] of queue.entries()) {
-            if (param.endsWith('Volume')) {
-                this.updateVolume(param.replace('Volume', ''), value);
-            } else if (param.endsWith('Pitch')) {
-                this.updatePitch(param.replace('Pitch', ''), value);
-            }
-        }
     }
 
     updatePitch(drum, value) {
@@ -117,6 +103,47 @@ export class DrumMachine extends AbstractInstrument {
         }
     }
 
+    async loadDefaultSamples() {
+        const defaultSamples = {
+            kick: '/assets/audio/drums/Kick.wav',
+            snare: '/assets/audio/drums/Snare.wav',
+            hihat: '/assets/audio/drums/HiHat.wav',
+            clap: '/assets/audio/drums/Clap.wav'
+        };
+
+        for (const [drum, url] of Object.entries(defaultSamples)) {
+            try {
+                await this.loadSampleFromURL(drum, url);
+                // Aggiorna lo stato visuale del sample loader
+                const status = this.renderer.container.querySelector(
+                    `.sample-loader[data-drum="${drum}"] .sample-status`
+                );
+                if (status) {
+                    status.textContent = 'Default sample loaded';
+                    status.classList.add('loaded');
+                }
+            } catch (error) {
+                console.warn(`Could not load default sample for ${drum}:`, error);
+            }
+        }
+    }
+
+    async loadSampleFromURL(drumName, url) {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            
+            const arrayBuffer = await response.arrayBuffer();
+            const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
+            
+            this.drums[drumName].buffer = audioBuffer;
+            return true;
+        } catch (error) {
+            console.error(`Error loading drum sample ${drumName} from URL:`, error);
+            throw error;
+        }
+    }
+
     playSample(name, time, velocity = 1) {
         if (!this.drums[name]?.buffer || !this.context) return;
 
@@ -148,14 +175,16 @@ export class DrumMachine extends AbstractInstrument {
     }
 
     onBeat(beat, time) {
+        // Assicuriamoci che il beat sia sempre tra 0 e 31
+        const normalizedBeat = beat % 32;
         const safeTime = Math.max(this.context.currentTime, time);
         
         requestAnimationFrame(() => {
-            this.renderer.highlightStep?.(beat);
+            this.renderer.highlightStep?.(normalizedBeat);
         });
 
         for (const [drum, sequence] of Object.entries(this.sequence)) {
-            const step = sequence[beat];
+            const step = sequence[normalizedBeat];
             if (step?.active && this.drums[drum]?.buffer) {
                 this.playSample(drum, safeTime, step.velocity);
             }

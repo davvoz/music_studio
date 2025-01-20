@@ -1,6 +1,11 @@
 export class AudioEngine {
     constructor() {
-        this.context = new AudioContext();
+        // Add buffer size adjustment
+        this.context = new AudioContext({
+            latencyHint: 'interactive',
+            sampleRate: 44100
+        });
+        
         this.instruments = new Map();
         this.masterOutput = this.context.createGain();
         this.masterOutput.connect(this.context.destination);
@@ -9,12 +14,12 @@ export class AudioEngine {
         this.tempo = 120;
         this.isPlaying = false;
         this.currentBeat = 0;
-        this.scheduleAheadTime = 0.1;
+        // Increase scheduler ahead time
+        this.scheduleAheadTime = 0.2; // Aumentato da 0.1 a 0.2
         this.lookAhead = 25.0; // milliseconds
         
         // Internal scheduling
         this.nextNoteTime = 0.0;
-        this.timerID = null;
 
         this.onBeatUpdate = null; // Callback for UI updates
 
@@ -26,38 +31,54 @@ export class AudioEngine {
 
         // Prevent audio suspension
         this.setupAudioResume();
+
+        // Performance optimization
+        this.scheduleQueue = [];
+        this.isProcessing = false;
+
+        // Inizializza il worker
+        const blob = new Blob([`
+            let timerID = null;
+            let interval = 25;
+            
+            self.onmessage = function(e) {
+                if (e.data === "start") {
+                    timerID = setInterval(() => postMessage("tick"), interval);
+                }
+                else if (e.data === "stop") {
+                    clearInterval(timerID);
+                    timerID = null;
+                }
+            };
+        `], { type: "text/javascript" });
+
+        this.timerWorker = new Worker(URL.createObjectURL(blob));
+        this.timerWorker.onmessage = () => {
+            if (this.isPlaying) this.processTick();
+        };
+
+        // Add performance mode flag
+        this.isHighPerformanceMode = true;
     }
 
     setupAudioResume() {
         let resumeTimeout;
         
-        // Lista di eventi che potrebbero sospendere l'audio
-        const events = ['scroll', 'touchstart', 'touchend', 'touchmove', 'mousedown', 'mouseup'];
-        
+        // Replace multiple listeners with single passive listener
         const resumeAudio = () => {
             if (this.context.state === 'suspended' && this.isPlaying) {
                 this.context.resume();
             }
-            // Riprogramma il check per 500ms dopo l'ultimo evento
-            clearTimeout(resumeTimeout);
-            resumeTimeout = setTimeout(() => {
-                if (this.context.state === 'suspended' && this.isPlaying) {
-                    this.context.resume();
-                }
-            }, 500);
         };
 
-        // Aggiungi i listener con passive: true per migliori performance
-        events.forEach(event => {
-            window.addEventListener(event, resumeAudio, { passive: true });
+        // Use single event listener with capture
+        window.addEventListener('touchstart', resumeAudio, { 
+            passive: true, 
+            capture: true 
         });
 
-        // Check periodico dello stato
-        setInterval(() => {
-            if (this.context.state === 'suspended' && this.isPlaying) {
-                this.context.resume();
-            }
-        }, 1000);
+        // Periodic check with longer interval
+        setInterval(resumeAudio, 2000);
     }
 
     addInstrument(id, instrument) {
@@ -88,14 +109,40 @@ export class AudioEngine {
         this.isPlaying = true;
         this.currentBeat = 0;
         this.nextNoteTime = this.context.currentTime;
-        this.scheduler();
+        this.totalBeats = 32; // Add this line to explicitly set total beats
+        this.timerWorker.postMessage("start");
     }
 
     stop() {
         this.isPlaying = false;
         this.currentBeat = 0;
-        clearTimeout(this.timerID);
+        this.timerWorker.postMessage("stop");
         this.instruments.forEach(instrument => instrument.allNotesOff?.());
+    }
+
+    processTick() {
+        // Add high performance mode check
+        if (!this.isHighPerformanceMode) {
+            if (document.hidden || this.isAnimating) return;
+        }
+
+        // Schedule notes until we reach the lookahead window
+        while (this.nextNoteTime < this.context.currentTime + this.scheduleAheadTime) {
+            this.scheduleBeat(this.currentBeat, this.nextNoteTime);
+            this.advanceNote();
+        }
+    }
+
+    processScheduledEvents(time) {
+        if (this.isProcessing) return;
+        this.isProcessing = true;
+
+        // Use requestIdleCallback for non-critical operations
+        requestIdleCallback(() => {
+            this.scheduleBeat(this.currentBeat, time);
+            this.nextBeat();
+            this.isProcessing = false;
+        });
     }
 
     scheduler() {
@@ -108,30 +155,21 @@ export class AudioEngine {
             this.scheduleBeat(this.currentBeat, this.nextNoteTime);
             this.nextBeat();
         }
-
-        // Usa requestAnimationFrame invece di setTimeout per migliore sincronizzazione
-        if (this.isPlaying) {
-            requestAnimationFrame(() => {
-                setTimeout(() => this.scheduler(), this.lookAhead);
-            });
-        }
     }
 
     scheduleBeat(beat, time) {
-        // Notify all instruments of the upcoming beat
+        const normalizedBeat = beat % 32; // Ensure we're always using 32 steps
+        
         this.instruments.forEach(instrument => {
-            instrument.onBeat?.(beat, time);
+            instrument.onBeat?.(normalizedBeat, time);
         });
         
-        // Update UI
         if (this.onBeatUpdate) {
-            // Use requestAnimationFrame for smooth UI updates
-            requestAnimationFrame(() => this.onBeatUpdate(beat));
+            requestAnimationFrame(() => this.onBeatUpdate(normalizedBeat));
         }
 
-        // Add metronome sound
         if (this.metronomeEnabled) {
-            this.playMetronomeSound(beat, time);
+            this.playMetronomeSound(normalizedBeat, time);
         }
     }
 
@@ -142,8 +180,9 @@ export class AudioEngine {
         osc.connect(gainNode);
         gainNode.connect(this.metronomeGain);
         
-        // High pitch for first beat of bar, low pitch for others
-        osc.frequency.value = beat % 4 === 0 ? 1000 : 800;
+        // Modifichiamo il metronomo per supportare 32 step
+        // Suono alto per l'inizio di ogni gruppo di 8 step
+        osc.frequency.value = beat % 8 === 0 ? 1000 : 800;
         
         gainNode.gain.setValueAtTime(0, time);
         gainNode.gain.linearRampToValueAtTime(1, time + 0.001);
@@ -161,7 +200,14 @@ export class AudioEngine {
     nextBeat() {
         const secondsPerBeat = 60.0 / this.tempo;
         this.nextNoteTime += secondsPerBeat;
-        this.currentBeat = (this.currentBeat + 1) % 16; // Assuming 16 beats per bar
+        // Ensure we're using 32 steps and the beat counter works correctly
+        this.currentBeat = (this.currentBeat + 1) % 32;
+    }
+
+    advanceNote() {
+        const secondsPerBeat = 60.0 / this.tempo;
+        this.nextNoteTime += secondsPerBeat;
+        this.currentBeat = (this.currentBeat + 1) % 32;
     }
 
     setTempo(newTempo) {

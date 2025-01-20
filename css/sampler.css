@@ -1,0 +1,393 @@
+.sampler {
+    background: linear-gradient(45deg, #1a1a1a, #2a2a2a);
+    border-radius: 10px;
+    padding: 20px;
+    color: #fff;
+    font-family: 'Share Tech Mono', monospace;
+}
+
+.sampler-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.sampler-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 5px;
+}
+
+.load-sample-btn {
+    background: #00ff9d;
+    color: #000;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.3s ease;
+}
+
+.load-sample-btn:hover {
+    background: #00cc7d;
+    transform: translateY(-1px);
+}
+
+.sample-info {
+    color: #888;
+    margin-left: 10px;
+}
+
+/* Mantieni solo gli stili essenziali */
+/* ...existing code for base styles... */
+
+/* Rimuovi tutti gli stili non utilizzati */
+.filter-section,
+.filter-controls,
+.playhead,
+.waveform-display,
+.waveform-canvas,
+.playback-button-group,
+.sample-play-btn,
+.sample-stop-btn,
+.rhythm-select {
+    display: none;
+}
+
+/* ...rest of existing styles... */
+
+.sequence-grido {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 15px;
+    border-radius: 5px;
+    margin: 20px 0;
+}
+
+.sequence-row {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+}
+
+.sequence-cell {
+    background: #272C32;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    padding: 8px;
+    border-radius: 4px;
+    min-width: 100px;  /* Increased to accommodate button */
+}
+
+.sequence-cell.active {
+    background: #3D4450;
+    border-color: #FF9500;
+    box-shadow: 0 0 10px rgba(255, 149, 0, 0.2);
+}
+
+.step-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;  /* Increased gap for better spacing */
+}
+
+.step-controls label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #808080;
+    font-size: 10px;
+    margin-top: 2px;
+}
+
+.step-controls label[for="start-slider"] {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.step-controls label[for="start-slider"]::after {
+    content: attr(data-value);
+    font-size: 9px;
+    color: #FF9500;
+    opacity: 0.8;
+}
+
+.pitch-select {
+    width: 100%;
+    background: #1E2328;
+    color: #FF9500;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: 4px;
+    padding: 4px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.velocity-slider,
+.length-slider {
+    width: 100%;
+    height: 4px;
+    -webkit-appearance: none;
+    background: #1E2328;
+    border-radius: 2px;
+    outline: none;
+}
+
+.length-slider {
+    width: 100%;
+    height: 8px;  /* Even taller for better precision */
+    -webkit-appearance: none;
+    background: linear-gradient(to right, 
+        #1E2328 0%, 
+        #FF9500 6.25%, /* 1/16 */
+        #FF9500 12.5%, /* 1/8 */
+        #FF8000 25%,   /* 1/4 */
+        #FF6B00 50%,   /* 1/2 */
+        #FF5500 100%   /* 16x */
+    );
+    border-radius: 4px;
+    outline: none;
+    margin: 8px 0;
+}
+
+.start-slider {
+    width: 100%;
+    height: 8px;
+    -webkit-appearance: none;
+    background: linear-gradient(to right, 
+        #FF9500 0%, 
+        #FF6B00 50%,
+        #FF4400 100%
+    );
+    border-radius: 4px;
+    outline: none;
+    margin: 8px 0;
+}
+
+.start-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    background: #FF9500;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid #1E2328;
+    box-shadow: 
+        0 0 4px rgba(255, 149, 0, 0.5),
+        0 0 10px rgba(255, 149, 0, 0.2);
+}
+
+.velocity-slider::-webkit-slider-thumb,
+.length-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    background: #FF9500;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.length-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;  /* Larger thumb */
+    height: 16px;
+    background: #FF9500;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid #1E2328;
+    box-shadow: 
+        0 0 4px rgba(255, 149, 0, 0.5),
+        0 0 10px rgba(255, 149, 0, 0.2);
+}
+
+.sequence-cell.playing {
+    border-color: #ff3366;
+    box-shadow: 0 0 10px rgba(255, 51, 102, 0.2);
+}
+
+.sequence-cell.bar-start {
+    margin-left: 8px;
+}
+
+.note-input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: white;
+    text-align: center;
+    font-size: 10px;
+    padding: 2px;
+}
+
+.note-input:focus {
+    outline: none;
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.sampler-controls {
+    display: flex;
+    flex-direction: row;
+}
+
+.step-toggle {
+    width: 100%;
+    padding: 4px;
+    margin-bottom: 4px;
+    background: #1E2328;
+    color: #808080;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+    transition: all 0.2s ease;
+}
+
+.step-toggle.active {
+    background: #FF9500;
+    color: #1E2328;
+    border-color: transparent;
+}
+
+.pattern-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-left: 20px;
+}
+
+.pattern-buttons {
+    display: flex;
+    flex-direction: row;
+}
+
+.pattern-btn {
+    background: #1E2328;
+    color: #808080;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.pattern-btn.active {
+    background: #FF9500;
+    color: #1E2328;
+    border-color: transparent;
+}
+
+.pattern-btn.saved {
+    animation: savePulse 0.2s ease;
+}
+
+.save-pattern {
+    padding: 4px 8px;
+    background: #1E2328;
+    color: #808080;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.save-pattern.active {
+    background: #FF9500;
+    color: #1E2328;
+}
+
+.save-mode .pattern-btn {
+    animation: saveMode 1s infinite;
+}
+
+@keyframes savePulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+@keyframes saveMode {
+    0% { border-color: rgba(255, 149, 0, 0.3); }
+    50% { border-color: #FF9500; }
+    100% { border-color: rgba(255, 149, 0, 0.3); }
+}
+
+/* ...existing code... */
+
+.pattern-types {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.pattern-type-btn {
+    padding: 4px 8px;
+    background: #1E2328;
+    color: #808080;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.pattern-type-btn:active,
+.pattern-type-btn.active {
+    background: #FF9500;
+    color: #1E2328;
+    transform: scale(0.95);
+}
+
+/* ...rest of existing code... */
+
+.pattern-length {
+    display: flex;
+    gap: 4px;
+    margin: 8px 0;
+    justify-content: center;
+}
+
+.length-btn {
+    padding: 4px 8px;
+    background: #1E2328;
+    color: #808080;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    min-width: 30px;
+    text-align: center;
+}
+
+.length-btn.active {
+    background: #FF9500;
+    color: #1E2328;
+    border-color: transparent;
+}
+
+.sequence-cell:nth-child(n+4):not(.active) {
+    opacity: 0.5;
+}
+
+/* Evidenzia le divisioni del pattern */
+.sequence-cell[data-step="0"],
+.sequence-cell[data-step="4"],
+.sequence-cell[data-step="8"],
+.sequence-cell[data-step="16"],
+.sequence-cell[data-step="24"] {
+    border-left: 2px solid rgba(255, 149, 0, 0.3);
+}
+
+/* ...existing code... */
+
+.sequence-cell.pattern-inactive {
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+.sequence-cell.pattern-inactive * {
+    pointer-events: none;
+}
+
+/* ...rest of existing code... */

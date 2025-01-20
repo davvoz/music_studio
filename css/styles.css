@@ -354,6 +354,11 @@ body {
     background: linear-gradient(45deg, #2b1f2b, #1a151a);
 }
 
+.instrument-container[data-type="sampler"] {
+    border: 2px solid #00ff9d;
+    background: linear-gradient(45deg, #1E2328, #272C32);
+}
+
 .add-instrument-btn {
     background: #34495e;
     color: #ecf0f1;
@@ -493,4 +498,49 @@ body {
 .knob-wrap span {
     font-size: 0.8em;
     color: #888;
+}
+
+.copy-paste-controls {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 15px;
+    padding: 10px;
+    background: var(--primary-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border-light);
+}
+
+.sequence-tools {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.sequence-tools button {
+    background: var(--secondary-bg);
+    color: var(--accent-color);
+    border: 1px solid var(--border-light);
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.sequence-tools button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.sequence-tools button:hover:not(:disabled) {
+    background: var(--accent-color);
+    color: var(--primary-bg);
+}
+
+.block-selector {
+    background: var(--secondary-bg);
+    color: var(--accent-color);
+    border: 1px solid var(--border-light);
+    padding: 5px;
+    border-radius: 4px;
+    font-size: 12px;
 }

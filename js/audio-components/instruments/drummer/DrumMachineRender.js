@@ -65,6 +65,7 @@ export class DrumMachineRender extends AbstractHTMLRender {
         this.createKnobs();
         this.createSequencer();
         this.setupSampleLoaders();
+        this.addCopyPasteControls(this.container.querySelector('.drum-grid'));
     }
 
     createKnobs() {
@@ -113,10 +114,6 @@ export class DrumMachineRender extends AbstractHTMLRender {
         return wrap;
     }
 
-    getDefaultFreq(drum) {
-        // Rimuoviamo questa funzione dato che non serve più
-    }
-
     getDefaultEnvelopeValue(param) {
         const defaults = {
             Attack: 0.01,
@@ -130,17 +127,28 @@ export class DrumMachineRender extends AbstractHTMLRender {
     createSequencer() {
         const grid = this.container.querySelector('.drum-grid');
         const drums = ['kick', 'snare', 'hihat', 'clap'];
+        const stepsPerBar = 8; // 8 step per battuta
+        const totalSteps = 32; // 4 battute da 8 step
 
         drums.forEach(drum => {
             const row = document.createElement('div');
             row.className = 'drum-row';
             row.dataset.drum = drum;
 
-            for (let step = 0; step < 16; step++) {
+            for (let step = 0; step < totalSteps; step++) {
                 const cell = document.createElement('div');
                 cell.className = 'drum-cell';
                 cell.dataset.step = step;
                 
+                // Aggiungiamo una classe per marcare l'inizio di ogni battuta
+                if (step % stepsPerBar === 0) {
+                    cell.classList.add('bar-start');
+                }
+                // Aggiungiamo una classe per marcare la metà di ogni battuta
+                if (step % (stepsPerBar/2) === 0) {
+                    cell.classList.add('half-bar');
+                }
+
                 cell.addEventListener('click', () => {
                     if (cell.classList.contains('active')) {
                         if (cell.classList.contains('accent')) {
@@ -206,55 +214,18 @@ export class DrumMachineRender extends AbstractHTMLRender {
     }
 
     setupEventListeners() {
-        // Ottimizza gestione eventi
-        this._eventThrottle = null;
-        
-        const handleEvent = (e) => {
-            if (this._eventThrottle) return;
-            
-            this._eventThrottle = setTimeout(() => {
-                this._eventThrottle = null;
-            }, 16);
-
+        // Gestione semplice degli eventi senza ottimizzazioni
+        this.container.addEventListener('click', (e) => {
             const target = e.target;
-            if (target.closest('.drum-cell')) {
-                this.handleCellClick(target.closest('.drum-cell'));
-            } else if (target.closest('.pattern-btn')) {
+            if (target.closest('.pattern-btn')) {
                 this.handlePatternClick(target.closest('.pattern-btn'));
             } else if (target.closest('.memory-btn')) {
                 this.handleMemoryClick(target.closest('.memory-btn'));
             } else if (target.closest('.save-btn')) {
                 this.handleSaveClick(target.closest('.save-btn'));
             }
-        };
-
-        this.container.addEventListener('click', handleEvent);
-        this.container.addEventListener('touchstart', handleEvent, { passive: true });
-    }
-
-    debounce(func, wait) {
-        let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-        };
-    }
-
-    handleEvent = (e) => {
-        requestIdleCallback(() => {
-            const target = e.target;
-            if (target.closest('.drum-cell')) {
-                this.handleCellClick(target.closest('.drum-cell'));
-            } else if (target.closest('.pattern-btn')) {
-                this.handlePatternClick(target.closest('.pattern-btn'));
-            }
-            // ... altri handler
         });
-    };
+    }
 
     handleCellClick(cell) {
         const drum = cell.parentElement.dataset.drum;
@@ -292,41 +263,31 @@ export class DrumMachineRender extends AbstractHTMLRender {
     }
 
     handleMemoryClick(memoryBtn) {
-        if (!memoryBtn || this.isSaving) return;
+        if (!memoryBtn) return;
 
-        requestAnimationFrame(() => {
-            if (this.isSaveMode) {
-                this.handleSaveMode(memoryBtn);
-            } else {
-                this.handleLoadMode(memoryBtn);
-            }
-        });
+        if (this.isSaveMode) {
+            this.handleSaveMode(memoryBtn);
+        } else {
+            this.handleLoadMode(memoryBtn);
+        }
     }
 
     handleSaveClick(saveBtn) {
-        if (this.isSaving) return;
-        
-        requestAnimationFrame(() => {
-            this.isSaveMode = !this.isSaveMode;
-            this.container.querySelectorAll('.memory-btn').forEach(btn => {
-                btn.classList.toggle('saving', this.isSaveMode);
-            });
+        this.isSaveMode = !this.isSaveMode;
+        this.container.querySelectorAll('.memory-btn').forEach(btn => {
+            btn.classList.toggle('saving', this.isSaveMode);
         });
     }
 
     handleSaveMode(btn) {
-        this.isSaving = true;
         this.savePattern(btn.dataset.slot);
         this.isSaveMode = false;
         
-        requestAnimationFrame(() => {
-            this.container.querySelectorAll('.memory-btn').forEach(b => b.classList.remove('saving'));
-            btn.classList.add('saved');
-            setTimeout(() => {
-                btn.classList.remove('saved');
-                this.isSaving = false;
-            }, 300);
-        });
+        this.container.querySelectorAll('.memory-btn').forEach(b => b.classList.remove('saving'));
+        btn.classList.add('saved');
+        setTimeout(() => {
+            btn.classList.remove('saved');
+        }, 300);
     }
 
     handleLoadMode(btn) {
@@ -339,30 +300,30 @@ export class DrumMachineRender extends AbstractHTMLRender {
 
     generateBasicPattern() {
         const pattern = {
-            kick:  [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
-            snare: [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0],
-            hihat: [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
-            clap:  [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0]
+            kick:  [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
+            snare: [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0],
+            hihat: [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+            clap:  [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0]
         };
         this.applyPattern(pattern);
     }
 
     generateHousePattern() {
         const pattern = {
-            kick:  [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
-            snare: [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0],
-            hihat: [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
-            clap:  [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,1]
+            kick:  [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,1,0, 1,0,0,0, 1,1,0,0],
+            snare: [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,1],
+            hihat: [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0, 1,1,1,0, 1,0,1,1, 1,1,1,1],
+            clap:  [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,1]
         };
         this.applyPattern(pattern);
     }
 
     generateBreakPattern() {
         const pattern = {
-            kick:  [1,0,0,1, 0,1,0,0, 1,0,1,0, 0,0,1,0],
-            snare: [0,0,1,0, 1,0,0,1, 0,1,0,0, 1,0,0,1],
-            hihat: [1,1,0,1, 1,0,1,1, 0,1,1,0, 1,1,0,1],
-            clap:  [0,0,1,0, 0,1,0,0, 0,0,1,0, 1,0,0,0]
+            kick:  [1,0,0,1, 0,1,0,0, 1,0,1,0, 0,0,1,0, 1,0,0,1, 0,1,0,0, 1,1,0,0, 1,0,1,0],
+            snare: [0,0,1,0, 1,0,0,1, 0,1,0,0, 1,0,0,1, 0,0,1,0, 1,0,0,1, 0,1,1,0, 1,0,0,1],
+            hihat: [1,1,0,1, 1,0,1,1, 0,1,1,0, 1,1,0,1, 1,1,0,1, 1,0,1,1, 1,1,1,0, 1,1,0,1],
+            clap:  [0,0,1,0, 0,1,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0, 0,1,0,1, 0,0,1,0, 1,1,0,0]
         };
         this.applyPattern(pattern);
     }
@@ -445,5 +406,42 @@ export class DrumMachineRender extends AbstractHTMLRender {
 
     setSequenceChangeCallback(callback) {
         this.sequenceChangeCallback = callback;
+    }
+
+    copySteps(start, end) {
+        const data = {};
+        this.container.querySelectorAll('.drum-row').forEach(row => {
+            const drum = row.dataset.drum;
+            data[drum] = Array.from(row.querySelectorAll('.drum-cell'))
+                .slice(start, end)
+                .map(cell => ({
+                    active: cell.classList.contains('active'),
+                    accent: cell.classList.contains('accent'),
+                    velocity: cell.classList.contains('accent') ? 1.5 : 
+                             cell.classList.contains('active') ? 1 : 0
+                }));
+        });
+        return data;
+    }
+
+    pasteSteps(data, targetStep) {
+        Object.entries(data).forEach(([drum, steps]) => {
+            const row = this.container.querySelector(`.drum-row[data-drum="${drum}"]`);
+            if (row) {
+                steps.forEach((stepData, index) => {
+                    const cell = row.querySelector(`[data-step="${targetStep + index}"]`);
+                    if (cell) {
+                        cell.classList.remove('active', 'accent');
+                        if (stepData.accent) {
+                            cell.classList.add('active', 'accent');
+                        } else if (stepData.active) {
+                            cell.classList.add('active');
+                        }
+                        this.sequenceChangeCallback?.(drum, targetStep + index, 
+                            stepData.active, stepData.velocity);
+                    }
+                });
+            }
+        });
     }
 }

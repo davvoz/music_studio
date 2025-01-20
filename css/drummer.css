@@ -26,6 +26,14 @@
         0 5px 15px rgba(0, 0, 0, 0.2);
 }
 
+.drum-grid {
+    max-width: 100%;
+    overflow-x: auto;
+    padding: 20px;
+    /* Assicuriamoci che la griglia sia abbastanza larga per 32 step */
+    min-width: fit-content;
+}
+
 .drum-knobs {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -104,13 +112,17 @@
 
 .drum-row {
     display: flex;
-    gap: 6px;
+    gap: 4px;
     margin-bottom: 6px;
+    padding-bottom: 6px;
+    /* Assicuriamoci che la riga sia abbastanza larga per 32 step */
+    min-width: max-content;
 }
 
 .drum-cell {
-    width: 40px;
-    height: 40px;
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
     background: var(--secondary-bg);
     border: 1px solid rgba(0, 255, 157, 0.2);
     border-radius: 8px;
@@ -137,10 +149,27 @@
 
 /* Add alternating bar indicators */
 .drum-cell[data-step="0"],
-.drum-cell[data-step="4"],
 .drum-cell[data-step="8"],
-.drum-cell[data-step="12"] {
-    border-left: 2px solid rgba(255, 149, 0, 0.3);
+.drum-cell[data-step="16"],
+.drum-cell[data-step="24"] {
+    border-left: 2px solid rgba(255, 149, 0, 0.5);
+    margin-left: 8px;
+}
+
+.drum-cell[data-step="4"],
+.drum-cell[data-step="12"],
+.drum-cell[data-step="20"],
+.drum-cell[data-step="28"] {
+    border-left: 1px solid rgba(255, 149, 0, 0.3);
+}
+
+.drum-cell.bar-start {
+    border-left: 2px solid rgba(255, 149, 0, 0.5);
+    margin-left: 8px;
+}
+
+.drum-cell.half-bar {
+    border-left: 1px solid rgba(255, 149, 0, 0.3);
 }
 
 .drum-samples {
@@ -218,8 +247,6 @@
 
 .pattern-btn {
     width: auto;
-    min-width: 50px;
-    height: 25px;
     background: var(--primary-bg);
     border: 1px solid rgba(0, 255, 157, 0.3);
     border-radius: 4px;
@@ -249,12 +276,6 @@
     padding: 0;
     cursor: pointer;
     transition: all 0.2s ease;
-}
-
-.pattern-actions {
-    display: flex;
-    justify-content: center;
-    margin-top: 8px;
 }
 
 .save-btn {
@@ -318,4 +339,18 @@
 .sequence-step.playing {
     animation: glow 0.5s ease;
     border-color: #00ff9d;
+}
+
+.drum-grid::-webkit-scrollbar {
+    height: 8px;
+}
+
+.drum-grid::-webkit-scrollbar-track {
+    background: var(--primary-bg);
+    border-radius: 4px;
+}
+
+.drum-grid::-webkit-scrollbar-thumb {
+    background: var(--accent-color);
+    border-radius: 4px;
 }
