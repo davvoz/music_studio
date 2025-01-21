@@ -330,13 +330,6 @@ body {
     font-family: 'Share Tech Mono', monospace;
 }
 
-.instrument-container {
-    margin: 30px;
-    padding: 25px;
-    border-radius: 15px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-    background: #2a2a2a;
-}
 
 /* Stili unici per ogni tipo di strumento */
 .instrument-container[data-type="tb303"] {
@@ -543,4 +536,34 @@ body {
     padding: 5px;
     border-radius: 4px;
     font-size: 12px;
+}
+
+/* Mute/Solo button styles */
+.mute-btn, .solo-btn {
+    padding: 5px 10px;
+    margin: 0 4px;
+    border-radius: 4px;
+    border: 1px solid #666;
+    background: #444;
+    color: #fff;
+    cursor: pointer;
+}
+
+.mute-btn.active {
+    background: #e74c3c;
+    color: white;
+}
+
+.solo-btn.active {
+    background: #f1c40f;
+    color: black;
+}
+
+.instrument-container.muted {
+    opacity: 0.5;
+}
+
+.instrument-container.soloed {
+    border-color: #f1c40f;
+    box-shadow: 0 0 10px rgba(241, 196, 15, 0.3);
 }

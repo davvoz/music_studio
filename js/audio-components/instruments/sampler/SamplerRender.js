@@ -30,6 +30,23 @@ export class SamplerRender extends AbstractHTMLRender {
                         <input type="file" accept="audio/*" style="display: none;">
                         <span class="sample-info">No sample loaded</span>
                     </div>
+                    <div class="global-controls">
+                        <div class="control-group">
+                            <label>Level</label>
+                            <input type="range" class="global-gain" min="0" max="2" value="1" step="0.1">
+                            <span class="global-gain-value">1.0</span>
+                        </div>
+                        <div class="control-group">
+                            <label>Global Pitch</label>
+                            <input type="range" class="global-pitch" min="-24" max="24" value="0" step="1">
+                            <span class="global-pitch-value">0</span>
+                        </div>
+                        <div class="control-group">
+                            <label>Global Length</label>
+                            <input type="range" class="global-length" min="0.1" max="4" value="1" step="0.1">
+                            <span class="global-length-value">1.0</span>
+                        </div>
+                    </div>
                     <div class="pattern-controls">
                         <div class="pattern-types">
                             <button class="pattern-type-btn" data-type="random">RND</button>
@@ -72,6 +89,34 @@ export class SamplerRender extends AbstractHTMLRender {
                 this.paramChangeCallback?.('loadSample', file);
                 this.updateSampleInfo(file.name);
             }
+        });
+
+        // Global controls listeners
+        const globalPitchSlider = this.container.querySelector('.global-pitch');
+        const globalLengthSlider = this.container.querySelector('.global-length');
+        const globalPitchValue = this.container.querySelector('.global-pitch-value');
+        const globalLengthValue = this.container.querySelector('.global-length-value');
+
+        globalPitchSlider.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            globalPitchValue.textContent = value;
+            this.paramChangeCallback?.('globalPitch', value);
+        });
+
+        globalLengthSlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value).toFixed(1);
+            globalLengthValue.textContent = value;
+            this.paramChangeCallback?.('globalLength', parseFloat(value));
+        });
+
+        // Gain control listener
+        const gainSlider = this.container.querySelector('.global-gain');
+        const gainValue = this.container.querySelector('.global-gain-value');
+
+        gainSlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value).toFixed(1);
+            gainValue.textContent = value;
+            this.paramChangeCallback?.('gain', parseFloat(value));
         });
 
         // Other control listeners

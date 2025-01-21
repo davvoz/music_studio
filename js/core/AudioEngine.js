@@ -59,6 +59,12 @@ export class AudioEngine {
 
         // Add performance mode flag
         this.isHighPerformanceMode = true;
+
+        // Add solo instrument property
+        this.isSoloedInstrument = null;
+
+        // Track mute/solo states
+        this.instrumentStates = new Map();
     }
 
     setupAudioResume() {
@@ -84,6 +90,7 @@ export class AudioEngine {
     addInstrument(id, instrument) {
         instrument.connect(this.masterOutput);
         this.instruments.set(id, instrument);
+        this.instrumentStates.set(id, { muted: false, soloed: false });
     }
 
     removeInstrument(id) {
@@ -92,6 +99,8 @@ export class AudioEngine {
             instrument.disconnect();
             this.instruments.delete(id);
         }
+        this.instrumentStates.delete(id);
+        this.updateMuteSoloStates();
     }
 
     start() {
@@ -212,5 +221,63 @@ export class AudioEngine {
 
     setTempo(newTempo) {
         this.tempo = Math.max(30, Math.min(3000, newTempo));
+    }
+
+    muteInstrument(id, shouldMute) {
+        const state = this.instrumentStates.get(id);
+        if (!state) return;
+
+        // Aggiorna lo stato
+        state.muted = shouldMute;
+        
+        // Aggiorna l'audio
+        const instrument = this.instruments.get(id);
+        if (instrument) {
+            instrument.setMuted(shouldMute);
+        }
+
+        this.updateMuteSoloStates();
+    }
+
+    soloInstrument(id, shouldSolo) {
+        const state = this.instrumentStates.get(id);
+        if (!state) return;
+
+        state.soloed = shouldSolo;
+
+        // Se stiamo attivando il solo, disattiva il mute
+        if (shouldSolo) {
+            state.muted = false;
+        }
+
+        this.updateMuteSoloStates();
+    }
+
+    updateMuteSoloStates() {
+        const hasSoloedInstruments = Array.from(this.instrumentStates.values())
+            .some(state => state.soloed);
+
+        this.instruments.forEach((instrument, id) => {
+            const state = this.instrumentStates.get(id);
+            if (!state) return;
+
+            // Aggiorna lo stato dell'instrument
+            instrument._hasSoloedInstruments = hasSoloedInstruments;
+            instrument.setMuted(state.muted);
+            instrument.setSolo(state.soloed);
+
+            // Emetti evento per l'UI
+            this.emitInstrumentStateChange(id, {
+                muted: state.muted,
+                soloed: state.soloed
+            });
+        });
+    }
+
+    emitInstrumentStateChange(id, state) {
+        const event = new CustomEvent('instrumentStateChange', {
+            detail: { id, state }
+        });
+        window.dispatchEvent(event);
     }
 }

@@ -8,8 +8,10 @@ export class Sampler extends AbstractInstrument {
         this.currentSample = null;
         
         this.parameters = {
-            gain: 0.7,
-            patternLength: 32  // Aggiungi la lunghezza del pattern di default
+            gain: 1.0,         // Aumentato il gain default
+            patternLength: 32,  // Aggiungi la lunghezza del pattern di default
+            globalPitch: 0,    // Aggiungi pitch globale
+            globalLength: 1.0  // Aggiungi length globale
         };
 
         // Initialize sequence with length parameter
@@ -69,6 +71,10 @@ export class Sampler extends AbstractInstrument {
                     // Aggiorna visivamente gli step attivi/inattivi
                     this.renderer.updatePatternLength?.(value);
                     break;
+                case 'globalPitch':
+                case 'globalLength':
+                    this.parameters[param] = value;
+                    break;
                 default:
                     this.parameters[param] = value;
             }
@@ -116,17 +122,24 @@ export class Sampler extends AbstractInstrument {
 
         const source = this.context.createBufferSource();
         source.buffer = this.currentSample.buffer;
-        source.playbackRate.value = Math.pow(2, pitch/12);
+        
+        // Applica il pitch globale
+        const finalPitch = pitch + this.parameters.globalPitch;
+        source.playbackRate.value = Math.pow(2, finalPitch/12);
+        
         source.connect(this.gainNode);
+        
+        // Aumentato il gain complessivo
+        const finalGain = velocity * this.parameters.gain * 1.5; // Moltiplicatore extra
         
         // Imposta il gain con rampa per evitare click
         this.gainNode.gain.cancelScheduledValues(time);
         this.gainNode.gain.setValueAtTime(0, time);
-        this.gainNode.gain.linearRampToValueAtTime(velocity * this.parameters.gain, time + 0.005);
+        this.gainNode.gain.linearRampToValueAtTime(finalGain, time + 0.005);
         
         // Calcola durata e offset
         const baseDuration = this.currentSample.buffer.duration;
-        const actualDuration = Math.max(0.01, baseDuration * length); // Previeni durate negative o zero
+        const actualDuration = Math.max(0.01, baseDuration * length * this.parameters.globalLength); // Previeni durate negative o zero
         const actualStart = Math.min(baseDuration * startOffset, baseDuration - 0.01); // Previeni start oltre la fine
 
         console.log('Playing sample:', {
@@ -143,7 +156,7 @@ export class Sampler extends AbstractInstrument {
             source.start(time, actualStart, actualDuration);
             
             // Fade out alla fine per evitare click
-            this.gainNode.gain.setValueAtTime(velocity * this.parameters.gain, time + actualDuration - 0.005);
+            this.gainNode.gain.setValueAtTime(finalGain, time + actualDuration - 0.005);
             this.gainNode.gain.linearRampToValueAtTime(0, time + actualDuration);
         } catch (error) {
             console.error('Error playing sample:', error);

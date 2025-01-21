@@ -21,6 +21,9 @@ export class AbstractInstrument extends AbstractAudioComponent {
         
         // Set initial values
         this.rackVolume.gain.value = 0.8;
+        this._savedVolume = 0.8;
+        this._isMuted = false;
+        this._isSoloed = false;
         
         // Connect the audio chain with effects
         this.instrumentOutput.connect(this.shaper.input);
@@ -53,7 +56,7 @@ export class AbstractInstrument extends AbstractAudioComponent {
         
         volumeKnob.addEventListener('input', (e) => {
             const value = parseFloat(e.target.value);
-            this.rackVolume.gain.value = value;
+            this.setVolume(value);
             this.vuMeter.setVolume(value);
         });
         
@@ -77,6 +80,31 @@ export class AbstractInstrument extends AbstractAudioComponent {
     // Helper method for child classes
     connectToInstrumentOutput(node) {
         node.connect(this.instrumentOutput);
+    }
+
+    setMuted(isMuted) {
+        this._isMuted = isMuted;
+        this._updateVolume();
+    }
+
+    setSolo(isSoloed) {
+        this._isSoloed = isSoloed;
+        this._updateVolume();
+    }
+
+    _updateVolume() {
+        if (this._isMuted || (this._hasSoloedInstruments && !this._isSoloed)) {
+            this.rackVolume.gain.setValueAtTime(0, this.context.currentTime);
+        } else {
+            this.rackVolume.gain.setValueAtTime(this._savedVolume, this.context.currentTime);
+        }
+    }
+
+    setVolume(value) {
+        this._savedVolume = value;
+        if (!this._isMuted) {
+            this.rackVolume.gain.setValueAtTime(value, this.context.currentTime);
+        }
     }
 }
 

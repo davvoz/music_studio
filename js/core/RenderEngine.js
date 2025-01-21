@@ -125,11 +125,11 @@ export class RenderEngine {
             this.transportState,
             playButton, 
             stopButton, 
-            metronomeButton,
+            //metronomeButton,
             addButton,  // Add the button here
             tempoSection,
-            beatDisplay,
-            this.currentBeatDisplay
+            //beatDisplay,
+            //this.currentBeatDisplay
         );
         
         this.container.appendChild(transport);
@@ -306,10 +306,64 @@ export class RenderEngine {
             instrumentContainer.remove();
         };
 
+        // Add mute button
+        const muteBtn = document.createElement('button');
+        muteBtn.textContent = 'Mute';
+        muteBtn.className = 'mute-btn';
+        muteBtn.onclick = (e) => {
+            e.stopPropagation();
+            const shouldMute = !muteBtn.classList.contains('active');
+            // Se stiamo unmutando uno strumento in solo, disattiva il solo
+            if (!shouldMute && soloBtn.classList.contains('active')) {
+                soloBtn.classList.remove('active');
+                this.audioEngine.soloInstrument(id, false);
+            }
+            this.audioEngine.muteInstrument(id, shouldMute);
+        };
+
+        // Add solo button
+        const soloBtn = document.createElement('button');
+        soloBtn.textContent = 'Solo';
+        soloBtn.className = 'solo-btn';
+        soloBtn.onclick = (e) => {
+            e.stopPropagation();
+            const shouldSolo = !soloBtn.classList.contains('active');
+            
+            if (shouldSolo) {
+                // Se stiamo attivando il solo, disattiva il mute
+                muteBtn.classList.remove('active');
+            }
+            
+            this.audioEngine.soloInstrument(id, shouldSolo);
+        };
+
+        // Listen for state changes with cleanup
+        const stateChangeHandler = (e) => {
+            if (e.detail.id === id) {
+                const { muted, soloed } = e.detail.state;
+                muteBtn.classList.toggle('active', muted);
+                soloBtn.classList.toggle('active', soloed);
+                instrumentContainer.classList.toggle('muted', muted);
+                instrumentContainer.classList.toggle('soloed', soloed);
+            }
+        };
+
+        window.addEventListener('instrumentStateChange', stateChangeHandler);
+        
+        // Cleanup event listener when instrument is removed
+        instrumentContainer.addEventListener('remove', () => {
+            window.removeEventListener('instrumentStateChange', stateChangeHandler);
+        });
+
+        // Set data attribute for targeting
+        instrumentContainer.dataset.instrumentId = id;
+
         // Assemble header
         header.appendChild(title);
         header.appendChild(collapseBtn);
         header.appendChild(removeBtn);
+        header.appendChild(muteBtn);
+        header.appendChild(soloBtn);
 
         // Make entire header clickable for collapse
         header.onclick = () => collapseBtn.click();
