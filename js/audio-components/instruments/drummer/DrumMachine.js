@@ -103,12 +103,20 @@ export class DrumMachine extends AbstractInstrument {
         }
     }
 
+    getBaseURL() {
+        // Get the repository name from the current URL for GitHub Pages
+        const pathArray = window.location.pathname.split('/');
+        const repoName = pathArray[1]; // Will be empty for local, repo name for GH Pages
+        return repoName ? `/${repoName}` : '';
+    }
+
     async loadDefaultSamples() {
+        const baseURL = this.getBaseURL();
         const defaultSamples = {
-            kick: '/assets/audio/drums/Kick.wav',
-            snare: '/assets/audio/drums/Snare.wav',
-            hihat: '/assets/audio/drums/HiHat.wav',
-            clap: '/assets/audio/drums/Clap.wav'
+            kick: `${baseURL}/assets/audio/drums/Kick.wav`,
+            snare: `${baseURL}/assets/audio/drums/Snare.wav`,
+            hihat: `${baseURL}/assets/audio/drums/HiHat.wav`,
+            clap: `${baseURL}/assets/audio/drums/Clap.wav`
         };
 
         for (const [drum, url] of Object.entries(defaultSamples)) {
@@ -163,7 +171,7 @@ export class DrumMachine extends AbstractInstrument {
             gain.connect(this.drums[name].gain);
 
             source.start(time);
-            source.stop(time + 1); // 1 secondo di default
+            source.stop(time + 1);
 
             source.onended = () => {
                 source.disconnect();
