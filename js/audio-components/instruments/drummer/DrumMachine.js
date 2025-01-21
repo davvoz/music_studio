@@ -111,12 +111,11 @@ export class DrumMachine extends AbstractInstrument {
     }
 
     async loadDefaultSamples() {
-        const baseURL = this.getBaseURL();
         const defaultSamples = {
-            kick: `${baseURL}/assets/audio/drums/Kick.wav`,
-            snare: `${baseURL}/assets/audio/drums/Snare.wav`,
-            hihat: `${baseURL}/assets/audio/drums/HiHat.wav`,
-            clap: `${baseURL}/assets/audio/drums/Clap.wav`
+            kick: './assets/audio/drums/Kick.wav',
+            snare: './assets/audio/drums/Snare.wav',
+            hihat: './assets/audio/drums/HiHat.wav',
+            clap: './assets/audio/drums/Clap.wav'
         };
 
         for (const [drum, url] of Object.entries(defaultSamples)) {
