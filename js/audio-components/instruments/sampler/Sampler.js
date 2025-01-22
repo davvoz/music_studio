@@ -148,16 +148,6 @@ export class Sampler extends AbstractInstrument {
         const actualDuration = Math.max(0.01, baseDuration * length * this.parameters.globalLength); // Previeni durate negative o zero
         const actualStart = Math.min(baseDuration * startOffset, baseDuration - 0.01); // Previeni start oltre la fine
 
-        console.log('Playing sample:', {
-            pitch,
-            velocity,
-            length,
-            actualDuration,
-            startOffset,
-            actualStart,
-            time
-        });
-
         try {
             source.start(time, actualStart, actualDuration);
             

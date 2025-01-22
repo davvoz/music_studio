@@ -681,21 +681,6 @@
     justify-content: center;
 }
 
-.step.inactive {
-    opacity: 0.3;
-}
-
-.step.inactive select:disabled,
-.step.inactive button:disabled {
-    pointer-events: none;
-    cursor: not-allowed;
-}
-
-.step.inactive select,
-.step.inactive button {
-    pointer-events: none;
-}
-
 /* ...existing code... */
 
 /* Rimuovi questi stili */

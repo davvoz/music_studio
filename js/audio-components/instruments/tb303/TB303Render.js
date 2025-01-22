@@ -13,6 +13,8 @@ export class TB303Render extends AbstractHTMLRender {
         this.createInterface();
         this.isSaveMode = false;
         this.isSaving = false;  // Nuovo flag per evitare salvataggi multipli
+        this.pendingUpdates = new Set();
+        this.updateFrame = null;
     }
 
     createInterface() {
@@ -181,13 +183,45 @@ export class TB303Render extends AbstractHTMLRender {
     }
 
     setupEventListeners() {
-        this.container.querySelectorAll('.wave-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                this.container.querySelectorAll('.wave-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                this.paramChangeCallback?.('waveform', btn.dataset.wave);
-            });
-        });
+        // Gestione wave buttons con event delegation
+        this.container.addEventListener('click', (e) => {
+            const target = e.target.closest('.wave-btn');
+            if (target) {
+                this.container.querySelectorAll('.wave-btn').forEach(btn => 
+                    btn.classList.remove('active'));
+                target.classList.add('active');
+                this.paramChangeCallback?.('waveform', target.dataset.wave);
+            }
+            
+            // Resto della gestione degli eventi...
+        }, { passive: true });
+
+        // Usa event delegation invece di multipli event listener
+        this.container.addEventListener('click', (e) => {
+            const target = e.target;
+            
+            if (target.classList.contains('wave-btn')) {
+                this.handleWaveButtonClick(target);
+            } else if (target.classList.contains('pattern-btn')) {
+                this.handlePatternButtonClick(target);
+            } else if (target.matches('.controls button')) {
+                this.handleControlButtonClick(target);
+            }
+        }, { passive: true });
+
+        // Throttle gli event listener dei cambi note
+        this.container.addEventListener('change', (e) => {
+            const target = e.target;
+            if (target.classList.contains('note')) {
+                if (!this.pendingUpdates.has(target)) {
+                    this.pendingUpdates.add(target);
+                    requestAnimationFrame(() => {
+                        this.handleNoteChange(target);
+                        this.pendingUpdates.delete(target);
+                    });
+                }
+            }
+        }, { passive: true });
 
         // Add button click handlers
         this.container.querySelectorAll('.controls button').forEach(btn => {
@@ -343,6 +377,15 @@ export class TB303Render extends AbstractHTMLRender {
 
     }
 
+    handleWaveButtonClick(target) {
+        if (!target.classList.contains('wave-btn')) return;
+        
+        this.container.querySelectorAll('.wave-btn').forEach(btn => 
+            btn.classList.remove('active'));
+        target.classList.add('active');
+        this.paramChangeCallback?.('waveform', target.dataset.wave);
+    }
+
     // Modifica il getStepData per usare direttamente currentOctaveShift
     getStepData(step) {
         const baseNote = step.querySelector('.note').value;
@@ -376,10 +419,12 @@ export class TB303Render extends AbstractHTMLRender {
         const basePattern = [];
         for (let i = 0; i < length; i++) {
             if (Math.random() < 0.7) {
+                // Sceglie casualmente tra ottava 1 e 2
+                const octave = Math.random() < 0.7 ? 1 : 2;
                 basePattern.push({
                     note: (Math.random() < 0.6 ? 
                           reorderedNotes[Math.floor(Math.random() * 5)] : 
-                          reorderedNotes[Math.floor(Math.random() * reorderedNotes.length)]) + '1',
+                          reorderedNotes[Math.floor(Math.random() * reorderedNotes.length)]) + octave,
                     accent: Math.random() < 0.3,
                     slide: Math.random() < 0.2
                 });
@@ -388,24 +433,12 @@ export class TB303Render extends AbstractHTMLRender {
             }
         }
 
-        const steps = this.container.querySelectorAll('.step');
-        for (let i = 0; i < 32; i++) {
-            const patternStep = basePattern[i % length];
-            const step = steps[i];
-            
-            step.querySelector('.note').value = patternStep.note;
-            step.querySelector('[data-type="accent"]').classList.toggle('active', patternStep.accent);
-            step.querySelector('[data-type="slide"]').classList.toggle('active', patternStep.slide);
-            
-            this.sequenceChangeCallback?.(i, this.getStepData(step));
-        }
+        this.applyPattern(basePattern, length);
     }
 
     generateRandomMinorPattern(length = 16) {
         this.clearAllSteps();
         const selectedKey = this.container.querySelector('.key-select').value;
-        // Natural minor scale (Aeolian mode): W-H-W-W-H-W-W
-        // Relative to C: C, D, Eb, F, G, Ab, Bb
         const minorScaleNotes = {
             'C': ['C', 'D', 'Eb', 'F', 'G', 'Ab', 'Bb'],
             'C#': ['C#', 'D#', 'E', 'F#', 'G#', 'A', 'B'],
@@ -422,13 +455,14 @@ export class TB303Render extends AbstractHTMLRender {
         };
 
         const scale = minorScaleNotes[selectedKey];
-        
-        // Genera il pattern base
         const basePattern = [];
+        
         for (let i = 0; i < length; i++) {
             if (Math.random() < 0.7) {
+                // Alterna tra ottava 1 e 2 con preferenza per l'ottava 1
+                const octave = Math.random() < 0.7 ? 1 : 2;
                 basePattern.push({
-                    note: scale[Math.floor(Math.random() * scale.length)] + '1',
+                    note: scale[Math.floor(Math.random() * scale.length)] + octave,
                     accent: Math.random() < 0.3,
                     slide: Math.random() < 0.2
                 });
@@ -437,24 +471,12 @@ export class TB303Render extends AbstractHTMLRender {
             }
         }
 
-        // Applica il pattern in loop
-        const steps = this.container.querySelectorAll('.step');
-        for (let i = 0; i < 32; i++) {
-            const patternStep = basePattern[i % length];
-            const step = steps[i];
-            
-            step.querySelector('.note').value = patternStep.note;
-            step.querySelector('[data-type="accent"]').classList.toggle('active', patternStep.accent);
-            step.querySelector('[data-type="slide"]').classList.toggle('active', patternStep.slide);
-            
-            this.sequenceChangeCallback?.(i, this.getStepData(step));
-        }
+        this.applyPattern(basePattern, length);
     }
 
     generateRandomMajorPattern(length = 16) {
         this.clearAllSteps();
         const selectedKey = this.container.querySelector('.key-select').value;
-        // Major scale: W-W-H-W-W-W-H
         const majorScaleNotes = {
             'C': ['C', 'D', 'E', 'F', 'G', 'A', 'B'],
             'C#': ['C#', 'D#', 'F', 'F#', 'G#', 'A#', 'C'],
@@ -471,13 +493,14 @@ export class TB303Render extends AbstractHTMLRender {
         };
 
         const scale = majorScaleNotes[selectedKey];
-        
-        // Genera il pattern base
         const basePattern = [];
+        
         for (let i = 0; i < length; i++) {
             if (Math.random() < 0.7) {
+                // Alterna tra ottava 1 e 2 con preferenza per l'ottava 1
+                const octave = Math.random() < 0.7 ? 1 : 2;
                 basePattern.push({
-                    note: scale[Math.floor(Math.random() * scale.length)] + '1',
+                    note: scale[Math.floor(Math.random() * scale.length)] + octave,
                     accent: (i % 4 === 0) ? Math.random() < 0.5 : Math.random() < 0.2,
                     slide: Math.random() < 0.15
                 });
@@ -486,12 +509,16 @@ export class TB303Render extends AbstractHTMLRender {
             }
         }
 
-        // Applica il pattern in loop
+        this.applyPattern(basePattern, length);
+    }
+
+    applyPattern(basePattern, length) {
         const steps = this.container.querySelectorAll('.step');
         for (let i = 0; i < 32; i++) {
             const patternStep = basePattern[i % length];
             const step = steps[i];
             
+            // Rimuoviamo completamente la gestione della classe inactive
             step.querySelector('.note').value = patternStep.note;
             step.querySelector('[data-type="accent"]').classList.toggle('active', patternStep.accent);
             step.querySelector('[data-type="slide"]').classList.toggle('active', patternStep.slide);
@@ -558,15 +585,14 @@ export class TB303Render extends AbstractHTMLRender {
     }
 
     highlightStep(stepIndex) {
-        // Rimuovi l'evidenziazione precedente
-        this.container.querySelectorAll('.step').forEach(step => 
-            step.classList.remove('playing'));
+        if (this.updateFrame) return;
         
-        // Evidenzia lo step corrente
-        const currentStep = this.container.querySelectorAll('.step')[stepIndex];
-        if (currentStep) {
-            currentStep.classList.add('playing');
-        }
+        this.updateFrame = requestAnimationFrame(() => {
+            const steps = this.container.querySelectorAll('.step');
+            steps.forEach(step => step.classList.remove('playing'));
+            steps[stepIndex]?.classList.add('playing');
+            this.updateFrame = null;
+        });
     }
 
     addCopyPasteControls(container) {

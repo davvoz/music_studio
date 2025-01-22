@@ -34,6 +34,13 @@ export class RenderEngine {
         // Add debounce utility
         this.debounceTimeout = null;
         this.isAnimating = false;
+
+        // Aggiungi performance optimizations
+        this.frameRequest = null;
+        this.lastBeatUpdate = 0;
+        this.minUpdateInterval = 16; // ~60fps
+        this.pendingUpdates = new Map();
+        this.isUpdating = false;
     }
 
     setupTransportSection() {
@@ -165,15 +172,33 @@ export class RenderEngine {
     }
 
     updateTransportDisplay(beat) {
-        // Update transport display for 32 steps instead of 16
-        const totalSteps = 32;
-        const currentBar = Math.floor(beat / 8) + 1;
-        const currentBeat = (beat % 8) + 1;
+        if (this.isUpdating) return;
         
-        if (this.transportDisplay) {
-            this.transportDisplay.textContent = 
-                `BAR ${currentBar} : BEAT ${currentBeat}`;
+        const now = performance.now();
+        if (now - this.lastBeatUpdate < this.minUpdateInterval) {
+            if (!this.frameRequest) {
+                this.frameRequest = requestAnimationFrame(() => this.updateTransportDisplay(beat));
+            }
+            return;
         }
+
+        this.isUpdating = true;
+        this.lastBeatUpdate = now;
+        
+        // Batch DOM updates
+        requestAnimationFrame(() => {
+            // Update transport display for 32 steps instead of 16
+            const totalSteps = 32;
+            const currentBar = Math.floor(beat / 8) + 1;
+            const currentBeat = (beat % 8) + 1;
+            
+            if (this.transportDisplay) {
+                this.transportDisplay.textContent = 
+                    `BAR ${currentBar} : BEAT ${currentBeat}`;
+            }
+            this.isUpdating = false;
+            this.frameRequest = null;
+        });
     }
 
     setupInstrumentRack() {
@@ -384,6 +409,20 @@ export class RenderEngine {
             instrumentContainer.classList.add('collapsed');
             collapseBtn.style.transform = 'rotate(0deg)';
         }
+
+        // Optimize event delegation
+        instrumentContainer.addEventListener('click', (e) => {
+            const target = e.target;
+            if (target.classList.contains('collapse-btn')) {
+                this.handleCollapse(instrumentContainer);
+            } else if (target.classList.contains('remove-instrument')) {
+                this.handleRemove(id, instrumentContainer);
+            } else if (target.classList.contains('mute-btn')) {
+                this.handleMute(id, target);
+            } else if (target.classList.contains('solo-btn')) {
+                this.handleSolo(id, target);
+            }
+        }, { passive: true });
     }
 
     setupVUMeter(canvas, instrument) {

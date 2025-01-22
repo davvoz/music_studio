@@ -2,6 +2,8 @@ export class AbstractHTMLRender {
   constructor() {
     this.container = document.createElement('div');
     this.container.classList.add('audio-component');
+    this.rafCallbacks = new Set();
+    this.isAnimating = false;
   }
 
   render() {
@@ -52,5 +54,20 @@ export class AbstractHTMLRender {
   pasteSteps(data, targetStep) {
     // Questo metodo deve essere implementato dalle classi figlie
     return null;
+  }
+
+  requestDOMUpdate(callback) {
+    if (this.isAnimating) {
+      this.rafCallbacks.add(callback);
+      return;
+    }
+
+    this.isAnimating = true;
+    requestAnimationFrame(() => {
+      callback();
+      this.rafCallbacks.forEach(cb => cb());
+      this.rafCallbacks.clear();
+      this.isAnimating = false;
+    });
   }
 }
