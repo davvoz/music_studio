@@ -2,9 +2,11 @@ import { AbstractHTMLRender } from "../../abstract/AbstractHTMLRender.js";
 import { Knob } from "../../../components/Knob.js";
 
 export class SamplerRender extends AbstractHTMLRender {
-    constructor() {
+    constructor(instanceId) {
         super();
+        this.instanceId = instanceId;
         this.container.classList.add('sampler');
+        this.container.setAttribute('data-instance-id', this.instanceId);
         this.paramChangeCallback = null;
         this.setupUI();
     }
@@ -321,6 +323,62 @@ export class SamplerRender extends AbstractHTMLRender {
         const cells = this.container.querySelectorAll('.sequence-cell');
         cells.forEach((cell, index) => {
             cell.classList.toggle('pattern-inactive', index >= length);
+        });
+    }
+
+    savePattern(patternNum) {
+        // Pattern numbers are 1-based in UI, 0-based in array
+        const index = patternNum - 1;
+        const pattern = {};
+        this.container.querySelectorAll('.sequence-cell').forEach((cell, i) => {
+            pattern[i] = {
+                active: cell.classList.contains('active'),
+                pitch: parseInt(cell.querySelector('.pitch-select').value),
+                velocity: parseFloat(cell.querySelector('.velocity-slider').value),
+                length: parseFloat(cell.querySelector('.length-slider').value),
+                startOffset: parseFloat(cell.querySelector('.start-slider').value)
+            };
+        });
+        // Usa l'ID univoco nella chiave del localStorage
+        localStorage.setItem(`${this.instanceId}-pattern-${index}`, JSON.stringify(pattern));
+    }
+
+    loadPattern(patternNum) {
+        const index = patternNum - 1;
+        // Usa l'ID univoco per recuperare il pattern
+        const savedPattern = localStorage.getItem(`${this.instanceId}-pattern-${index}`);
+        if (!savedPattern) return;
+
+        const pattern = JSON.parse(savedPattern);
+        const updates = [];
+
+        this.container.querySelectorAll('.sequence-cell').forEach((cell, i) => {
+            const data = pattern[i];
+            if (data) {
+                cell.classList.toggle('active', data.active);
+                cell.querySelector('.pitch-select').value = data.pitch;
+                cell.querySelector('.velocity-slider').value = data.velocity;
+                cell.querySelector('.length-slider').value = data.length;
+                cell.querySelector('.start-slider').value = data.startOffset;
+                
+                const toggleBtn = cell.querySelector('.step-toggle');
+                if (toggleBtn) {
+                    toggleBtn.textContent = data.active ? 'ON' : 'OFF';
+                    toggleBtn.classList.toggle('active', data.active);
+                }
+
+                updates.push([i, data]);
+            }
+        });
+
+        // Batch update sequence
+        requestAnimationFrame(() => {
+            updates.forEach(([index, data]) => {
+                this.paramChangeCallback?.('updateSequence', {
+                    step: index,
+                    ...data
+                });
+            });
         });
     }
 }

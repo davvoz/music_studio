@@ -14,6 +14,7 @@ export class AudioEngine {
         this.tempo = 120;
         this.isPlaying = false;
         this.currentBeat = 0;
+        this.totalBeats = 32; // Aggiungi questo
         // Increase scheduler ahead time
         this.scheduleAheadTime = 0.2; // Aumentato da 0.1 a 0.2
         this.lookAhead = 25.0; // milliseconds
@@ -161,8 +162,11 @@ export class AudioEngine {
         }
 
         while (this.nextNoteTime < this.context.currentTime + this.scheduleAheadTime) {
+            // Usa un tempo più corretto per 32 step
+            const secondsPerBeat = 60.0 / (this.tempo * 2); // Dividi il tempo per 2 per ottenere 32 step
             this.scheduleBeat(this.currentBeat, this.nextNoteTime);
-            this.nextBeat();
+            this.nextNoteTime += secondsPerBeat;
+            this.currentBeat = (this.currentBeat + 1) % 32;
         }
     }
 
@@ -214,13 +218,15 @@ export class AudioEngine {
     }
 
     advanceNote() {
-        const secondsPerBeat = 60.0 / this.tempo;
+        // Usa un tempo più corretto per 32 step
+        const secondsPerBeat = 60.0 / (this.tempo * 2); // Dividi il tempo per 2
         this.nextNoteTime += secondsPerBeat;
         this.currentBeat = (this.currentBeat + 1) % 32;
     }
 
     setTempo(newTempo) {
-        this.tempo = Math.max(30, Math.min(3000, newTempo));
+        // Dividi il tempo per 2 per mantenere il timing corretto con 32 step
+        this.tempo = Math.max(30, Math.min(3000, newTempo)) / 2;
     }
 
     muteInstrument(id, shouldMute) {

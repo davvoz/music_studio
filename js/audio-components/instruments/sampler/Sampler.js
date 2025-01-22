@@ -4,7 +4,10 @@ import { SamplerRender } from "./SamplerRender.js";
 export class Sampler extends AbstractInstrument {
     constructor(context) {
         super(context);
-        this.renderer = new SamplerRender();
+        // Aggiungi un ID univoco per ogni istanza
+        this.instanceId = 'sampler_' + Date.now();
+        // Passa l'ID al renderer
+        this.renderer = new SamplerRender(this.instanceId);
         this.currentSample = null;
         
         this.parameters = {
@@ -37,6 +40,7 @@ export class Sampler extends AbstractInstrument {
         this.gainNode.gain.value = this.parameters.gain;
 
         this.setupEventListeners(); // Aggiungi questa chiamata
+        this.selectedLength = 32; // Aggiungi questa linea
     }
 
     setupEventListeners() {
@@ -67,6 +71,7 @@ export class Sampler extends AbstractInstrument {
                     this.generatePattern(value);
                     break;
                 case 'patternLength':
+                    this.selectedLength = parseInt(value);
                     this.parameters.patternLength = parseInt(value);
                     // Aggiorna visivamente gli step attivi/inattivi
                     this.renderer.updatePatternLength?.(value);
@@ -95,19 +100,20 @@ export class Sampler extends AbstractInstrument {
     }
 
     onBeat(beat, time) {
-        // Always loop through the full sequence
-        const stepIndex = beat % this.sequence.length;
-        const step = this.sequence[stepIndex];
+        // Loop continuo su 32 step
+        const stepIndex = beat % 32;
+        if (stepIndex >= this.selectedLength) return;
 
-        if (step?.active && this.currentSample?.buffer) {
-            this.playSample(
-                step.pitch,
-                step.velocity,
-                step.length,
-                time,
-                step.startOffset
-            );
-        }
+        const step = this.sequence[stepIndex];
+        if (!step?.active || !this.currentSample?.buffer) return;
+
+        this.playSample(
+            step.pitch,
+            step.velocity,
+            step.length,
+            time,
+            step.startOffset
+        );
 
         requestAnimationFrame(() => {
             this.renderer.highlightStep?.(stepIndex);
@@ -184,14 +190,14 @@ export class Sampler extends AbstractInstrument {
         // Pattern numbers are 1-based in UI, 0-based in array
         const index = patternNum - 1;
         this.patterns[index] = JSON.parse(JSON.stringify(this.sequence));
-        // Save to localStorage
-        localStorage.setItem(`sampler-pattern-${index}`, JSON.stringify(this.sequence));
+        // Usa l'ID univoco nella chiave del localStorage
+        localStorage.setItem(`${this.instanceId}-pattern-${index}`, JSON.stringify(this.sequence));
     }
 
     loadPattern(patternNum) {
         const index = patternNum - 1;
-        // Try loading from localStorage first
-        const saved = localStorage.getItem(`sampler-pattern-${index}`);
+        // Usa l'ID univoco per recuperare il pattern
+        const saved = localStorage.getItem(`${this.instanceId}-pattern-${index}`);
         if (saved) {
             this.patterns[index] = JSON.parse(saved);
         }

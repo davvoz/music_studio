@@ -622,3 +622,38 @@
     color: white;
     border-color: #999;
 }
+
+
+
+.key-select {
+    background: #2c3e50;
+    color: #ecf0f1;
+    border: 1px solid #34495e;
+    padding: 5px;
+    margin: 0 5px;
+    border-radius: 4px;
+    font-family: 'Share Tech Mono', monospace;
+}
+
+.key-select:focus {
+    outline: none;
+    border-color: #3498db;
+}
+
+
+
+.step.inactive {
+    opacity: 0.3;
+}
+
+.step.inactive select:disabled,
+.step.inactive button:disabled {
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
+.step.inactive select,
+.step.inactive button {
+    pointer-events: none;
+}
+

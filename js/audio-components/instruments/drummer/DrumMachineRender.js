@@ -2,9 +2,11 @@ import { AbstractHTMLRender } from "../../abstract/AbstractHTMLRender.js";
 import { Knob } from "../../../components/Knob.js";
 
 export class DrumMachineRender extends AbstractHTMLRender {
-    constructor() {
+    constructor(instanceId) {
         super();
+        this.instanceId = instanceId;
         this.container.classList.add('drum-machine');
+        this.container.setAttribute('data-instance-id', this.instanceId);
         this.paramChangeCallback = null;
         this.sequenceChangeCallback = null;
         this.isSaveMode = false;
@@ -280,7 +282,8 @@ export class DrumMachineRender extends AbstractHTMLRender {
     }
 
     handleSaveMode(btn) {
-        this.savePattern(btn.dataset.slot);
+        const slot = btn.dataset.slot;
+        this.paramChangeCallback?.('savePattern', slot);
         this.isSaveMode = false;
         
         this.container.querySelectorAll('.memory-btn').forEach(b => b.classList.remove('saving'));
@@ -291,7 +294,8 @@ export class DrumMachineRender extends AbstractHTMLRender {
     }
 
     handleLoadMode(btn) {
-        this.loadPattern(btn.dataset.slot);
+        const slot = btn.dataset.slot;
+        this.paramChangeCallback?.('loadPattern', slot);
         requestAnimationFrame(() => {
             this.container.querySelectorAll('.memory-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
@@ -311,7 +315,7 @@ export class DrumMachineRender extends AbstractHTMLRender {
     generateHousePattern() {
         const pattern = {
             kick:  [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,1,0, 1,0,0,0, 1,1,0,0],
-            snare: [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,1],
+            snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,1,1],
             hihat: [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0, 1,1,1,0, 1,0,1,1, 1,1,1,1],
             clap:  [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,1]
         };
@@ -352,11 +356,13 @@ export class DrumMachineRender extends AbstractHTMLRender {
                 return 0;
             });
         });
-        localStorage.setItem(`drum-pattern-${slot}`, JSON.stringify(pattern));
+        // Usa l'ID univoco nella chiave del localStorage
+        localStorage.setItem(`${this.instanceId}-pattern-${slot}`, JSON.stringify(pattern));
     }
 
     loadPattern(slot) {
-        const savedPattern = localStorage.getItem(`drum-pattern-${slot}`);
+        // Usa l'ID univoco per recuperare il pattern
+        const savedPattern = localStorage.getItem(`${this.instanceId}-pattern-${slot}`);
         if (!savedPattern) return;
 
         const pattern = JSON.parse(savedPattern);

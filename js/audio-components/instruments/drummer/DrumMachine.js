@@ -4,7 +4,10 @@ import { DrumMachineRender } from "./DrumMachineRender.js";
 export class DrumMachine extends AbstractInstrument {
     constructor(context) {
         super(context);
-        this.renderer = new DrumMachineRender();
+        // Aggiungi un ID univoco per ogni istanza
+        this.instanceId = 'drum_' + Date.now();
+        // Passa l'ID al renderer
+        this.renderer = new DrumMachineRender(this.instanceId);
 
         this.drums = {
             kick: { buffer: null },
@@ -31,6 +34,14 @@ export class DrumMachine extends AbstractInstrument {
         this.setupAudio();
         this.setupEvents();
         this.loadDefaultSamples();
+
+        // Carica il pattern salvato se esiste
+        const lastUsedPattern = localStorage.getItem(`${this.instanceId}-last-pattern`);
+        if (lastUsedPattern) {
+            this.loadSavedPattern(lastUsedPattern);
+        }
+
+        this.selectedLength = 32; // Aggiungi questa linea
     }
 
     setupAudio() {
@@ -48,6 +59,14 @@ export class DrumMachine extends AbstractInstrument {
                     await this.loadSampleFromFile(value.drum, value.file);
                     return;
                 }
+                if (param === 'loadPattern') {
+                    this.loadSavedPattern(value);
+                    return;
+                }
+                if (param === 'savePattern') {
+                    this.saveCurrentPattern(value);
+                    return;
+                }
 
                 this.parameters[param] = value;
                 
@@ -56,6 +75,11 @@ export class DrumMachine extends AbstractInstrument {
                     this.updateVolume(param.replace('Volume', ''), value);
                 } else if (param.endsWith('Pitch')) {
                     this.updatePitch(param.replace('Pitch', ''), value);
+                }
+
+                if (param === 'patternLength') {
+                    this.selectedLength = parseInt(value);
+                    this.renderer.updatePatternLength?.(value);
                 }
             } catch (error) {
                 console.warn('Parameter change error:', error);
@@ -182,19 +206,51 @@ export class DrumMachine extends AbstractInstrument {
     }
 
     onBeat(beat, time) {
-        // Assicuriamoci che il beat sia sempre tra 0 e 31
-        const normalizedBeat = beat % 32;
+        // Loop continuo su 32 step
+        const stepIndex = beat % 32;
+        if (stepIndex >= this.selectedLength) return;
+        
         const safeTime = Math.max(this.context.currentTime, time);
         
         requestAnimationFrame(() => {
-            this.renderer.highlightStep?.(normalizedBeat);
+            this.renderer.highlightStep?.(stepIndex);
         });
 
         for (const [drum, sequence] of Object.entries(this.sequence)) {
-            const step = sequence[normalizedBeat];
+            const step = sequence[stepIndex];
             if (step?.active && this.drums[drum]?.buffer) {
                 this.playSample(drum, safeTime, step.velocity);
             }
         }
+    }
+
+    loadSavedPattern(slot) {
+        const savedPattern = localStorage.getItem(`${this.instanceId}-pattern-${slot}`);
+        if (!savedPattern) return;
+
+        try {
+            const pattern = JSON.parse(savedPattern);
+            Object.entries(pattern).forEach(([drum, steps]) => {
+                if (this.sequence[drum]) {
+                    this.sequence[drum] = steps.map(value => ({
+                        active: value > 0,
+                        velocity: value === 2 ? 1.5 : value === 1 ? 1 : 0
+                    }));
+                }
+            });
+        } catch (error) {
+            console.error('Error loading pattern:', error);
+        }
+    }
+
+    saveCurrentPattern(slot) {
+        const pattern = {};
+        Object.entries(this.sequence).forEach(([drum, steps]) => {
+            pattern[drum] = steps.map(step => 
+                step.active ? (step.velocity > 1 ? 2 : 1) : 0
+            );
+        });
+        localStorage.setItem(`${this.instanceId}-pattern-${slot}`, JSON.stringify(pattern));
+        localStorage.setItem(`${this.instanceId}-last-pattern`, slot);
     }
 }
