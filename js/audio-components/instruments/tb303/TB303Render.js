@@ -2,9 +2,11 @@ import { AbstractHTMLRender } from "../../abstract/AbstractHTMLRender.js";
 import { Knob } from "../../../components/Knob.js";
 
 export class TB303Render extends AbstractHTMLRender {
-    constructor() {
+    constructor(instanceId) {
         super();
+        this.instanceId = instanceId;
         this.container.classList.add('tb303-mini');
+        this.container.setAttribute('data-instance-id', this.instanceId);
         this.paramChangeCallback = null;
         this.sequenceChangeCallback = null;
         this.createInterface();
@@ -419,23 +421,30 @@ export class TB303Render extends AbstractHTMLRender {
     }
 
     savePattern(slot) {
-        // Cattura il pattern prima di qualsiasi animazione
-        const pattern = {
-            steps: Array.from(this.container.querySelectorAll('.step')).map(step => this.getStepData(step))
-        };
-        localStorage.setItem(`tb303-pattern-${slot}`, JSON.stringify(pattern));
+        const pattern = {};
+        this.container.querySelectorAll('.step').forEach((step, index) => {
+            pattern[index] = {
+                note: step.querySelector('.note').value,
+                accent: step.querySelector('[data-type="accent"]').classList.contains('active'),
+                slide: step.querySelector('[data-type="slide"]').classList.contains('active')
+            };
+        });
+        // Usa l'ID univoco nella chiave del localStorage
+        localStorage.setItem(`${this.instanceId}-pattern-${slot}`, JSON.stringify(pattern));
+        // Salva l'ultimo pattern usato per questa istanza
+        localStorage.setItem(`${this.instanceId}-last-pattern`, slot);
     }
 
     loadPattern(slot) {
-        const savedPattern = localStorage.getItem(`tb303-pattern-${slot}`);
+        // Usa l'ID univoco per recuperare il pattern
+        const savedPattern = localStorage.getItem(`${this.instanceId}-pattern-${slot}`);
         if (!savedPattern) return;
-        
+
         const pattern = JSON.parse(savedPattern);
-        // Raggruppa tutte le modifiche prima di notificare
         const updates = [];
-        
+
         this.container.querySelectorAll('.step').forEach((step, index) => {
-            const data = pattern.steps[index];
+            const data = pattern[index];
             if (data) {
                 step.querySelector('.note').value = data.note;
                 step.querySelector('[data-type="accent"]').classList.toggle('active', data.accent);
@@ -443,8 +452,7 @@ export class TB303Render extends AbstractHTMLRender {
                 updates.push([index, data]);
             }
         });
-        
-        // Notifica tutte le modifiche in un unico batch
+
         requestAnimationFrame(() => {
             updates.forEach(([index, data]) => {
                 this.sequenceChangeCallback?.(index, data);

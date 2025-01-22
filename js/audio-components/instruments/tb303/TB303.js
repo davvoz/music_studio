@@ -4,7 +4,10 @@ import { TB303Render } from "./TB303Render.js";
 export class TB303 extends AbstractInstrument {
     constructor(context) {
         super(context);
-        this.renderer = new TB303Render();
+        // Aggiungi ID univoco
+        this.instanceId = 'tb303_' + Date.now();
+        // Passa l'ID al renderer
+        this.renderer = new TB303Render(this.instanceId);
         
         // Inizializza la sequenza con 32 step vuoti
         this.sequence = Array(32).fill().map(() => ({
