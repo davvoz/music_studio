@@ -4,6 +4,11 @@ export class AbstractHTMLRender {
     this.container.classList.add('audio-component');
     this.rafCallbacks = new Set();
     this.isAnimating = false;
+    this.domCache = new Map();
+    this.updateQueue = new Set();
+    this.frameId = null;
+    this.lastUpdateTime = 0;
+    this.updateThreshold = 1000 / 60; // 60fps
   }
 
   render() {
@@ -69,5 +74,39 @@ export class AbstractHTMLRender {
       this.rafCallbacks.clear();
       this.isAnimating = false;
     });
+  }
+
+  getCachedElement(selector) {
+    if (!this.domCache.has(selector)) {
+      this.domCache.set(selector, this.container.querySelector(selector));
+    }
+    return this.domCache.get(selector);
+  }
+
+  queueUpdate(callback) {
+    this.updateQueue.add(callback);
+    this.scheduleUpdate();
+  }
+
+  scheduleUpdate() {
+    if (this.frameId) return;
+
+    const now = performance.now();
+    const timeSinceLastUpdate = now - this.lastUpdateTime;
+
+    if (timeSinceLastUpdate >= this.updateThreshold) {
+      this.frameId = requestAnimationFrame(() => this.processUpdates());
+    }
+  }
+
+  processUpdates() {
+    this.lastUpdateTime = performance.now();
+    this.updateQueue.forEach(callback => callback());
+    this.updateQueue.clear();
+    this.frameId = null;
+  }
+
+  clearCache() {
+    this.domCache.clear();
   }
 }

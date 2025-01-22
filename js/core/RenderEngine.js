@@ -41,6 +41,12 @@ export class RenderEngine {
         this.minUpdateInterval = 16; // ~60fps
         this.pendingUpdates = new Map();
         this.isUpdating = false;
+
+        // Add new properties
+        this.instrumentCache = new Map();
+        this.uiUpdateQueue = new Set();
+        this.lastUIUpdate = 0;
+        this.updateInterval = 1000 / 60; // 60fps target
     }
 
     setupTransportSection() {
@@ -271,158 +277,170 @@ export class RenderEngine {
         document.body.appendChild(modal);
     }
 
-    addInstrumentUI(id, instrumentComponent) {
-        const instrumentContainer = document.createElement('div');
-        instrumentContainer.className = 'instrument-container';
-        instrumentContainer.dataset.type = instrumentComponent.constructor.name.toLowerCase();
-
-        // Create header
-        const header = document.createElement('div');
-        header.className = 'instrument-header';
-
-        // Add title
-        const title = document.createElement('h3');
-        title.textContent = instrumentComponent.constructor.name;
-        
-        // Add collapse button with optimized animation
-        const collapseBtn = document.createElement('button');
-        collapseBtn.className = 'collapse-btn';
-        collapseBtn.innerHTML = '▼';
-        
-        // Optimize collapse animation
-        const handleCollapse = (e) => {
-            if (this.isAnimating) return;
-            e.stopPropagation();
-            
-            this.isAnimating = true;
-            const panel = instrumentContainer.querySelector('.instrument-panel');
-            
-            // Use CSS transform instead of height animation
+    queueInstrumentUpdate(id, callback) {
+        if (!this.uiUpdateQueue.has(id)) {
+            this.uiUpdateQueue.add(id);
             requestAnimationFrame(() => {
-                instrumentContainer.classList.toggle('collapsed');
-                collapseBtn.style.transform = 
-                    instrumentContainer.classList.contains('collapsed') 
-                        ? 'rotate(0deg)' 
-                        : 'rotate(180deg)';
-                
-                // Save state after animation is complete
-                clearTimeout(this.debounceTimeout);
-                this.debounceTimeout = setTimeout(() => {
-                    const type = instrumentContainer.dataset.type;
-                    localStorage.setItem(`${type}-${id}-collapsed`, 
-                        instrumentContainer.classList.contains('collapsed'));
-                    this.isAnimating = false;
-                }, 200);
+                callback();
+                this.uiUpdateQueue.delete(id);
             });
-        };
-
-        collapseBtn.onclick = handleCollapse;
-        header.onclick = (e) => {
-            if (!this.isAnimating) handleCollapse(e);
-        };
-
-        // Add remove button
-        const removeBtn = document.createElement('button');
-        removeBtn.className = 'remove-instrument';
-        removeBtn.textContent = '✕';
-        removeBtn.onclick = (e) => {
-            e.stopPropagation();
-            this.audioEngine.removeInstrument(id);
-            instrumentContainer.remove();
-        };
-
-        // Add mute button
-        const muteBtn = document.createElement('button');
-        muteBtn.textContent = 'Mute';
-        muteBtn.className = 'mute-btn';
-        muteBtn.onclick = (e) => {
-            e.stopPropagation();
-            const shouldMute = !muteBtn.classList.contains('active');
-            // Se stiamo unmutando uno strumento in solo, disattiva il solo
-            if (!shouldMute && soloBtn.classList.contains('active')) {
-                soloBtn.classList.remove('active');
-                this.audioEngine.soloInstrument(id, false);
-            }
-            this.audioEngine.muteInstrument(id, shouldMute);
-        };
-
-        // Add solo button
-        const soloBtn = document.createElement('button');
-        soloBtn.textContent = 'Solo';
-        soloBtn.className = 'solo-btn';
-        soloBtn.onclick = (e) => {
-            e.stopPropagation();
-            const shouldSolo = !soloBtn.classList.contains('active');
-            
-            if (shouldSolo) {
-                // Se stiamo attivando il solo, disattiva il mute
-                muteBtn.classList.remove('active');
-            }
-            
-            this.audioEngine.soloInstrument(id, shouldSolo);
-        };
-
-        // Listen for state changes with cleanup
-        const stateChangeHandler = (e) => {
-            if (e.detail.id === id) {
-                const { muted, soloed } = e.detail.state;
-                muteBtn.classList.toggle('active', muted);
-                soloBtn.classList.toggle('active', soloed);
-                instrumentContainer.classList.toggle('muted', muted);
-                instrumentContainer.classList.toggle('soloed', soloed);
-            }
-        };
-
-        window.addEventListener('instrumentStateChange', stateChangeHandler);
-        
-        // Cleanup event listener when instrument is removed
-        instrumentContainer.addEventListener('remove', () => {
-            window.removeEventListener('instrumentStateChange', stateChangeHandler);
-        });
-
-        // Set data attribute for targeting
-        instrumentContainer.dataset.instrumentId = id;
-
-        // Assemble header
-        header.appendChild(title);
-        header.appendChild(collapseBtn);
-        header.appendChild(removeBtn);
-        header.appendChild(muteBtn);
-        header.appendChild(soloBtn);
-
-        // Make entire header clickable for collapse
-        header.onclick = () => collapseBtn.click();
-
-        // Instrument panel
-        const instrumentPanel = document.createElement('div');
-        instrumentPanel.className = 'instrument-panel';
-        instrumentPanel.appendChild(instrumentComponent.render());
-
-        // Assemble the layout
-        instrumentContainer.append(header, instrumentPanel);
-        this.instrumentRack.appendChild(instrumentContainer);
-
-        // Restore collapsed state from localStorage
-        const type = instrumentContainer.dataset.type;
-        const isCollapsed = localStorage.getItem(`${type}-${id}-collapsed`) === 'true';
-        if (isCollapsed) {
-            instrumentContainer.classList.add('collapsed');
-            collapseBtn.style.transform = 'rotate(0deg)';
         }
+    }
 
-        // Optimize event delegation
-        instrumentContainer.addEventListener('click', (e) => {
-            const target = e.target;
-            if (target.classList.contains('collapse-btn')) {
-                this.handleCollapse(instrumentContainer);
-            } else if (target.classList.contains('remove-instrument')) {
-                this.handleRemove(id, instrumentContainer);
-            } else if (target.classList.contains('mute-btn')) {
-                this.handleMute(id, target);
-            } else if (target.classList.contains('solo-btn')) {
-                this.handleSolo(id, target);
+    addInstrumentUI(id, instrumentComponent) {
+        this.queueInstrumentUpdate(id, () => {
+            const instrumentContainer = document.createElement('div');
+            instrumentContainer.className = 'instrument-container';
+            instrumentContainer.dataset.type = instrumentComponent.constructor.name.toLowerCase();
+
+            // Create header
+            const header = document.createElement('div');
+            header.className = 'instrument-header';
+
+            // Add title
+            const title = document.createElement('h3');
+            title.textContent = instrumentComponent.constructor.name;
+            
+            // Add collapse button with optimized animation
+            const collapseBtn = document.createElement('button');
+            collapseBtn.className = 'collapse-btn';
+            collapseBtn.innerHTML = '▼';
+            
+            // Optimize collapse animation
+            const handleCollapse = (e) => {
+                if (this.isAnimating) return;
+                e.stopPropagation();
+                
+                this.isAnimating = true;
+                const panel = instrumentContainer.querySelector('.instrument-panel');
+                
+                // Use CSS transform instead of height animation
+                requestAnimationFrame(() => {
+                    instrumentContainer.classList.toggle('collapsed');
+                    collapseBtn.style.transform = 
+                        instrumentContainer.classList.contains('collapsed') 
+                            ? 'rotate(0deg)' 
+                            : 'rotate(180deg)';
+                    
+                    // Save state after animation is complete
+                    clearTimeout(this.debounceTimeout);
+                    this.debounceTimeout = setTimeout(() => {
+                        const type = instrumentContainer.dataset.type;
+                        localStorage.setItem(`${type}-${id}-collapsed`, 
+                            instrumentContainer.classList.contains('collapsed'));
+                        this.isAnimating = false;
+                    }, 200);
+                });
+            };
+
+            collapseBtn.onclick = handleCollapse;
+            header.onclick = (e) => {
+                if (!this.isAnimating) handleCollapse(e);
+            };
+
+            // Add remove button
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'remove-instrument';
+            removeBtn.textContent = '✕';
+            removeBtn.onclick = (e) => {
+                e.stopPropagation();
+                this.audioEngine.removeInstrument(id);
+                instrumentContainer.remove();
+            };
+
+            // Add mute button
+            const muteBtn = document.createElement('button');
+            muteBtn.textContent = 'Mute';
+            muteBtn.className = 'mute-btn';
+            muteBtn.onclick = (e) => {
+                e.stopPropagation();
+                const shouldMute = !muteBtn.classList.contains('active');
+                // Se stiamo unmutando uno strumento in solo, disattiva il solo
+                if (!shouldMute && soloBtn.classList.contains('active')) {
+                    soloBtn.classList.remove('active');
+                    this.audioEngine.soloInstrument(id, false);
+                }
+                this.audioEngine.muteInstrument(id, shouldMute);
+            };
+
+            // Add solo button
+            const soloBtn = document.createElement('button');
+            soloBtn.textContent = 'Solo';
+            soloBtn.className = 'solo-btn';
+            soloBtn.onclick = (e) => {
+                e.stopPropagation();
+                const shouldSolo = !soloBtn.classList.contains('active');
+                
+                if (shouldSolo) {
+                    // Se stiamo attivando il solo, disattiva il mute
+                    muteBtn.classList.remove('active');
+                }
+                
+                this.audioEngine.soloInstrument(id, shouldSolo);
+            };
+
+            // Listen for state changes with cleanup
+            const stateChangeHandler = (e) => {
+                if (e.detail.id === id) {
+                    const { muted, soloed } = e.detail.state;
+                    muteBtn.classList.toggle('active', muted);
+                    soloBtn.classList.toggle('active', soloed);
+                    instrumentContainer.classList.toggle('muted', muted);
+                    instrumentContainer.classList.toggle('soloed', soloed);
+                }
+            };
+
+            window.addEventListener('instrumentStateChange', stateChangeHandler);
+            
+            // Cleanup event listener when instrument is removed
+            instrumentContainer.addEventListener('remove', () => {
+                window.removeEventListener('instrumentStateChange', stateChangeHandler);
+            });
+
+            // Set data attribute for targeting
+            instrumentContainer.dataset.instrumentId = id;
+
+            // Assemble header
+            header.appendChild(title);
+            header.appendChild(collapseBtn);
+            header.appendChild(removeBtn);
+            header.appendChild(muteBtn);
+            header.appendChild(soloBtn);
+
+            // Make entire header clickable for collapse
+            header.onclick = () => collapseBtn.click();
+
+            // Instrument panel
+            const instrumentPanel = document.createElement('div');
+            instrumentPanel.className = 'instrument-panel';
+            instrumentPanel.appendChild(instrumentComponent.render());
+
+            // Assemble the layout
+            instrumentContainer.append(header, instrumentPanel);
+            this.instrumentRack.appendChild(instrumentContainer);
+
+            // Restore collapsed state from localStorage
+            const type = instrumentContainer.dataset.type;
+            const isCollapsed = localStorage.getItem(`${type}-${id}-collapsed`) === 'true';
+            if (isCollapsed) {
+                instrumentContainer.classList.add('collapsed');
+                collapseBtn.style.transform = 'rotate(0deg)';
             }
-        }, { passive: true });
+
+            // Optimize event delegation
+            instrumentContainer.addEventListener('click', (e) => {
+                const target = e.target;
+                if (target.classList.contains('collapse-btn')) {
+                    this.handleCollapse(instrumentContainer);
+                } else if (target.classList.contains('remove-instrument')) {
+                    this.handleRemove(id, instrumentContainer);
+                } else if (target.classList.contains('mute-btn')) {
+                    this.handleMute(id, target);
+                } else if (target.classList.contains('solo-btn')) {
+                    this.handleSolo(id, target);
+                }
+            }, { passive: true });
+        });
     }
 
     setupVUMeter(canvas, instrument) {

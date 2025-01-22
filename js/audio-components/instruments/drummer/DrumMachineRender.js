@@ -272,11 +272,17 @@ export class DrumMachineRender extends AbstractHTMLRender {
 
     handleLoadMode(btn) {
         const slot = btn.dataset.slot;
-        this.paramChangeCallback?.('loadPattern', slot);
         
-        // Remove active class from all buttons and add it to the clicked one
-        this.container.querySelectorAll('.memory-btn').forEach(b => b.classList.remove('active'));
+        // Rimuovi la classe active da tutti i pulsanti prima
+        this.container.querySelectorAll('.memory-btn').forEach(b => 
+            b.classList.remove('active')
+        );
+        
+        // Aggiungi la classe active solo al pulsante selezionato
         btn.classList.add('active');
+        
+        // Chiama il callback per caricare il pattern
+        this.paramChangeCallback?.('loadPattern', slot);
     }
 
     applyPattern(pattern) {
@@ -399,13 +405,18 @@ export class DrumMachineRender extends AbstractHTMLRender {
     }
 
     updateSequenceDisplay(sequence) {
+        // Prima rimuoviamo tutte le classi active e accent
+        this.container.querySelectorAll('.drum-cell').forEach(cell => {
+            cell.classList.remove('active', 'accent');
+        });
+
+        // Poi applichiamo il nuovo stato
         Object.entries(sequence).forEach(([drum, steps]) => {
             const row = this.container.querySelector(`.drum-row[data-drum="${drum}"]`);
             if (row) {
                 steps.forEach((step, index) => {
                     const cell = row.querySelector(`[data-step="${index}"]`);
                     if (cell) {
-                        cell.classList.remove('active', 'accent');
                         if (step.active) {
                             cell.classList.add('active');
                             if (step.velocity > 1) {

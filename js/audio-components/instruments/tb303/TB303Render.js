@@ -15,6 +15,8 @@ export class TB303Render extends AbstractHTMLRender {
         this.isSaving = false;  // Nuovo flag per evitare salvataggi multipli
         this.pendingUpdates = new Set();
         this.updateFrame = null;
+        this.eventHandlers = new Map();
+        this.setupEventDelegation();
     }
 
     createInterface() {
@@ -183,198 +185,157 @@ export class TB303Render extends AbstractHTMLRender {
     }
 
     setupEventListeners() {
-        // Gestione wave buttons con event delegation
-        this.container.addEventListener('click', (e) => {
-            const target = e.target.closest('.wave-btn');
-            if (target) {
-                this.container.querySelectorAll('.wave-btn').forEach(btn => 
-                    btn.classList.remove('active'));
-                target.classList.add('active');
-                this.paramChangeCallback?.('waveform', target.dataset.wave);
-            }
-            
-            // Resto della gestione degli eventi...
-        }, { passive: true });
-
-        // Usa event delegation invece di multipli event listener
-        this.container.addEventListener('click', (e) => {
-            const target = e.target;
-            
-            if (target.classList.contains('wave-btn')) {
-                this.handleWaveButtonClick(target);
-            } else if (target.classList.contains('pattern-btn')) {
-                this.handlePatternButtonClick(target);
-            } else if (target.matches('.controls button')) {
-                this.handleControlButtonClick(target);
-            }
-        }, { passive: true });
-
-        // Throttle gli event listener dei cambi note
-        this.container.addEventListener('change', (e) => {
-            const target = e.target;
-            if (target.classList.contains('note')) {
-                if (!this.pendingUpdates.has(target)) {
-                    this.pendingUpdates.add(target);
-                    requestAnimationFrame(() => {
-                        this.handleNoteChange(target);
-                        this.pendingUpdates.delete(target);
-                    });
-                }
-            }
-        }, { passive: true });
-
-        // Add button click handlers
-        this.container.querySelectorAll('.controls button').forEach(btn => {
-            btn.addEventListener('click', () => {
-                btn.classList.toggle('active');
-                const step = btn.closest('.step');
-                const index = Array.from(step.parentNode.children).indexOf(step);
-                if (index >= 0) {
-                    this.sequenceChangeCallback?.(index, this.getStepData(step));
-                }
-            });
-        });
-
-        // Handle note changes
-        this.container.querySelectorAll('.note').forEach((select, index) => {
-            select.addEventListener('change', () => {
-                const step = select.closest('.step');
-                this.sequenceChangeCallback?.(index, this.getStepData(step));
-            });
-        });
-
-        // Replace the old random pattern handlers with the new unified approach
-        this.container.querySelectorAll('.pattern-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const type = btn.dataset.pattern;
-                switch(type) {
-                    case 'random':
-                        this.generateRandomPattern();
-                        break;
-                    case 'minor':
-                        this.generateRandomMinorPattern();
-                        break;
-                    case 'major':
-                        this.generateRandomMajorPattern();
-                        break;
-                }
-                // Visual feedback
-                btn.classList.add('active');
-                setTimeout(() => btn.classList.remove('active'), 200);
-            });
-        });
-
-        // Gestione salvataggio pattern
-        let selectedSlot = null;
-        
-        this.container.querySelectorAll('.memory-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                if (this.isSaving) return; // Previeni click multipli durante il salvataggio
-                
-                if (this.isSaveMode) {
-                    this.isSaving = true;  // Blocca altri salvataggi
-                    this.savePattern(btn.dataset.slot);
-                    this.isSaveMode = false;
-                    this.container.querySelectorAll('.memory-btn').forEach(b => b.classList.remove('saving'));
-                    btn.classList.add('saved');
-                    setTimeout(() => {
-                        btn.classList.remove('saved');
-                        this.isSaving = false;  // Riabilita i salvataggi
-                    }, 300);
-                } else {
-                    this.loadPattern(btn.dataset.slot);
-                    this.container.querySelectorAll('.memory-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                }
-            });
-        });
-
-        this.container.querySelector('.save-btn').addEventListener('click', () => {
-            if (this.isSaving) return; // Previeni click multipli durante il salvataggio
-            
-            this.isSaveMode = !this.isSaveMode;
-            this.container.querySelectorAll('.memory-btn').forEach(btn => {
-                btn.classList.toggle('saving', this.isSaveMode);
-            });
-        });
-
-        // Gestione dei pattern length buttons
-        let selectedLength = 16; // Default pattern length
-        this.container.querySelectorAll('.length-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                this.container.querySelectorAll('.length-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                selectedLength = parseInt(btn.dataset.length);
-            });
-        });
-
-        // Modifica della gestione dei pattern buttons
-        this.container.querySelectorAll('.pattern-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const type = btn.dataset.pattern;
-                switch(type) {
-                    case 'random':
-                        this.generateRandomPattern(selectedLength);
-                        break;
-                    case 'minor':
-                        this.generateRandomMinorPattern(selectedLength);
-                        break;
-                    case 'major':
-                        this.generateRandomMajorPattern(selectedLength);
-                        break;
-                }
-                btn.classList.add('active');
-                setTimeout(() => btn.classList.remove('active'), 200);
-            });
-        });
-
-        // Attiva il bottone 16 di default
+        // Rimuovi tutti i vecchi event listener individuali e lascia solo
+        // l'inizializzazione di base
+        const selectedLength = 16;
         this.container.querySelector('.length-btn[data-length="16"]').classList.add('active');
+    }
 
-        // Aggiungi gli event listener per i pulsanti di trasposizione
-        this.container.querySelectorAll('.transpose-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                this.transposePattern(btn.dataset.dir);
-                // Feedback visivo
-                btn.classList.add('active');
-                setTimeout(() => btn.classList.remove('active'), 200);
-            });
-        });
-
-        // Aggiungi gestione dei pulsanti ottava
-        this.container.querySelectorAll('.octave-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const direction = btn.dataset.dir;
-                if (this.transposePattern(direction)) {
-                    // Feedback visivo solo se ci sono stati cambiamenti
-                    btn.classList.add('active');
-                    setTimeout(() => btn.classList.remove('active'), 100);
-                }
-            });
-        });
-
-        // Rimuovi questo blocco che causa l'errore
-        /*
-        this.renderer.setParameterChangeCallback((param, value) => {
-            if (param === 'octave') {
-                this.currentOctaveShift = Math.round(value);
-                this.container.querySelectorAll('.step').forEach((step, index) => {
+    setupEventDelegation() {
+        // Rimuovi gli altri event listener e centralizza qui
+        const handlers = {
+            'click': {
+                '.wave-btn': (e, target) => {
+                    this.container.querySelectorAll('.wave-btn').forEach(btn => 
+                        btn.classList.remove('active'));
+                    target.classList.add('active');
+                    this.paramChangeCallback?.('waveform', target.dataset.wave);
+                },
+                '.pattern-btn': this.handlePatternButtonClick.bind(this),
+                '[data-type="accent"]': (e, target) => {
+                    target.classList.toggle('active');
+                    const step = target.closest('.step');
+                    const index = Array.from(step.parentNode.children).indexOf(step);
                     this.sequenceChangeCallback?.(index, this.getStepData(step));
-                });
+                },
+                '[data-type="slide"]': (e, target) => {
+                    target.classList.toggle('active');
+                    const step = target.closest('.step');
+                    const index = Array.from(step.parentNode.children).indexOf(step);
+                    this.sequenceChangeCallback?.(index, this.getStepData(step));
+                },
+                '.memory-btn': this.handleMemoryButtonClick.bind(this),
+                '.save-btn': this.handleSaveButtonClick.bind(this),
+                '.length-btn': this.handleLengthButtonClick.bind(this),
+                '.transpose-btn': this.handleTransposeButtonClick.bind(this)
+            },
+            'change': {
+                '.note': this.handleNoteChange.bind(this),
+                '.key-select': this.handleKeyChange.bind(this)
+            }
+        };
+
+        // Rimuovi tutti gli altri event listener esistenti
+        this.container.querySelectorAll('.controls button').forEach(btn => {
+            btn.replaceWith(btn.cloneNode(true));
+        });
+
+        // Usa un singolo event listener per tipo
+        Object.entries(handlers).forEach(([eventType, eventHandlers]) => {
+            this.container.addEventListener(eventType, (e) => {
+                for (const [selector, handler] of Object.entries(eventHandlers)) {
+                    const target = e.target.closest(selector);
+                    if (target) {
+                        handler(e, target);
+                        break;
+                    }
+                }
+            }, { passive: true });
+        });
+    }
+
+    handleWaveButtonClick(e, target) {
+        this.queueUpdate(() => {
+            this.container.querySelectorAll('.wave-btn').forEach(btn => 
+                btn.classList.remove('active'));
+            target.classList.add('active');
+            this.paramChangeCallback?.('waveform', target.dataset.wave);
+        });
+    }
+
+    handlePatternButtonClick(e, target) {
+        const type = target.dataset.pattern;
+        const length = parseInt(this.container.querySelector('.length-btn.active')?.dataset.length || '16');
+        switch(type) {
+            case 'random': this.generateRandomPattern(length); break;
+            case 'minor': this.generateRandomMinorPattern(length); break;
+            case 'major': this.generateRandomMajorPattern(length); break;
+        }
+        target.classList.add('active');
+        setTimeout(() => target.classList.remove('active'), 200);
+    }
+
+    handleControlButtonClick(e, target) {
+        if (!target.matches('[data-type="accent"], [data-type="slide"]')) return;
+        
+        const step = target.closest('.step');
+        if (!step) return;
+
+        target.classList.toggle('active');
+        const index = Array.from(step.parentNode.children).indexOf(step);
+        
+        this.queueUpdate(() => {
+            this.sequenceChangeCallback?.(index, this.getStepData(step));
+        });
+    }
+
+    handleMemoryButtonClick(e, target) {
+        if (this.isSaving) return;
+        
+        if (this.isSaveMode) {
+            this.isSaving = true;
+            this.savePattern(target.dataset.slot);
+            this.isSaveMode = false;
+            this.container.querySelectorAll('.memory-btn').forEach(b => b.classList.remove('saving'));
+            target.classList.add('saved');
+            setTimeout(() => {
+                target.classList.remove('saved');
+                this.isSaving = false;
+            }, 300);
+        } else {
+            this.loadPattern(target.dataset.slot);
+            this.container.querySelectorAll('.memory-btn').forEach(b => b.classList.remove('active'));
+            target.classList.add('active');
+        }
+    }
+
+    handleSaveButtonClick(e, target) {
+        if (this.isSaving) return;
+        this.isSaveMode = !this.isSaveMode;
+        this.container.querySelectorAll('.memory-btn').forEach(btn => {
+            btn.classList.toggle('saving', this.isSaveMode);
+        });
+    }
+
+    handleLengthButtonClick(e, target) {
+        this.container.querySelectorAll('.length-btn').forEach(b => b.classList.remove('active'));
+        target.classList.add('active');
+    }
+
+    handleTransposeButtonClick(e, target) {
+        this.transposePattern(target.dataset.dir);
+        target.classList.add('active');
+        setTimeout(() => target.classList.remove('active'), 200);
+    }
+
+    handleNoteChange(e, target) {
+        const step = target.closest('.step');
+        if (!step) return;
+        const index = Array.from(step.parentNode.children).indexOf(step);
+        this.sequenceChangeCallback?.(index, this.getStepData(step));
+    }
+
+    handleKeyChange(e, target) {
+        // Implementa se necessario
+    }
+
+    highlightStep(stepIndex) {
+        this.queueUpdate(() => {
+            const steps = this.getCachedElement('.tb303-sequence').children;
+            for (let i = 0; i < steps.length; i++) {
+                steps[i].classList.toggle('playing', i === stepIndex);
             }
         });
-        */
-
-        // Sostituiscilo con la gestione diretta del callback nel createKnob
-        // Il callback è già gestito qui:
-        /*
-        createKnob(param, label, container) {
-            // ...existing code...
-            config.onChange: (v) => this.paramChangeCallback?.(param, v)
-            // ...existing code...
-        }
-        */
-
     }
 
     handleWaveButtonClick(target) {
@@ -419,12 +380,12 @@ export class TB303Render extends AbstractHTMLRender {
         const basePattern = [];
         for (let i = 0; i < length; i++) {
             if (Math.random() < 0.7) {
-                // Sceglie casualmente tra ottava 1 e 2
-                const octave = Math.random() < 0.7 ? 1 : 2;
+                // Usa direttamente l'ottava base senza adjustedOctave
+                const baseOctave = Math.random() < 0.7 ? 1 : 2;
                 basePattern.push({
                     note: (Math.random() < 0.6 ? 
                           reorderedNotes[Math.floor(Math.random() * 5)] : 
-                          reorderedNotes[Math.floor(Math.random() * reorderedNotes.length)]) + octave,
+                          reorderedNotes[Math.floor(Math.random() * reorderedNotes.length)]) + baseOctave,
                     accent: Math.random() < 0.3,
                     slide: Math.random() < 0.2
                 });
@@ -459,10 +420,10 @@ export class TB303Render extends AbstractHTMLRender {
         
         for (let i = 0; i < length; i++) {
             if (Math.random() < 0.7) {
-                // Alterna tra ottava 1 e 2 con preferenza per l'ottava 1
-                const octave = Math.random() < 0.7 ? 1 : 2;
+                // Usa l'ottava base direttamente
+                const baseOctave = Math.random() < 0.7 ? 1 : 2;
                 basePattern.push({
-                    note: scale[Math.floor(Math.random() * scale.length)] + octave,
+                    note: scale[Math.floor(Math.random() * scale.length)] + baseOctave,
                     accent: Math.random() < 0.3,
                     slide: Math.random() < 0.2
                 });
@@ -497,10 +458,10 @@ export class TB303Render extends AbstractHTMLRender {
         
         for (let i = 0; i < length; i++) {
             if (Math.random() < 0.7) {
-                // Alterna tra ottava 1 e 2 con preferenza per l'ottava 1
-                const octave = Math.random() < 0.7 ? 1 : 2;
+                // Usa l'ottava base direttamente
+                const baseOctave = Math.random() < 0.7 ? 1 : 2;
                 basePattern.push({
-                    note: scale[Math.floor(Math.random() * scale.length)] + octave,
+                    note: scale[Math.floor(Math.random() * scale.length)] + baseOctave,
                     accent: (i % 4 === 0) ? Math.random() < 0.5 : Math.random() < 0.2,
                     slide: Math.random() < 0.15
                 });
