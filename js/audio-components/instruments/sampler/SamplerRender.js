@@ -231,6 +231,16 @@ export class SamplerRender extends AbstractHTMLRender {
         const pitchSelect = cell.querySelector('.pitch-select');
         const startSlider = cell.querySelector('.start-slider');
 
+        // Fix velocity slider display
+        const velocityLabel = cell.querySelector('label[for="velocity-slider"]');
+        velocitySlider.addEventListener('input', () => {
+            const value = Math.round(velocitySlider.value * 100);
+            velocityLabel?.setAttribute('data-value', `${value}%`);
+            if (cell.classList.contains('active')) {
+                this.updateStep(cell, step);
+            }
+        });
+
         // Toggle button handler
         toggleBtn.addEventListener('click', () => {
             const isActive = cell.classList.toggle('active');
@@ -319,10 +329,10 @@ export class SamplerRender extends AbstractHTMLRender {
     }
 
     updatePatternLength(length) {
-        // Aggiorna visivamente gli step in base alla lunghezza del pattern
+        // Only visually indicate pattern length, don't disable steps
         const cells = this.container.querySelectorAll('.sequence-cell');
         cells.forEach((cell, index) => {
-            cell.classList.toggle('pattern-inactive', index >= length);
+            cell.classList.toggle('pattern-highlight', index < length);
         });
     }
 

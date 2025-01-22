@@ -268,6 +268,15 @@
     -ms-user-select: none;
 }
 
+/* Aggiungi stile specifico per il knob dell'ottava */
+.knob-wrap[data-param="octave"] {
+    background: linear-gradient(145deg, #2a3038, #1E2328);
+}
+
+.knob-wrap[data-param="octave"] span {
+    color: #00FF9C;  /* Colore differente per distinguerlo */
+}
+
 .tb303-sequence {
     margin-top: 25px;
     background: linear-gradient(to bottom, #1E2328, #272C32);
@@ -626,6 +635,30 @@
 
 
 .key-select {
+    background: #1E2328;
+    color: #FF9500;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-family: 'Monaco', monospace;
+    font-size: 12px;
+    margin-right: 4px;
+    cursor: pointer;
+}
+
+.key-select:focus {
+    outline: none;
+    border-color: #FF9500;
+    box-shadow: 0 0 10px rgba(255, 149, 0, 0.2);
+}
+
+.key-select option {
+    background: #1E2328;
+    color: #FF9500;
+    padding: 4px;
+}
+
+.key-select {
     background: #2c3e50;
     color: #ecf0f1;
     border: 1px solid #34495e;
@@ -640,7 +673,13 @@
     border-color: #3498db;
 }
 
-
+/* Aggiorna il layout dei controlli pattern per accomodare il nuovo selettore */
+.pattern-type {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
 
 .step.inactive {
     opacity: 0.3;
@@ -656,4 +695,17 @@
 .step.inactive button {
     pointer-events: none;
 }
+
+/* ...existing code... */
+
+/* Rimuovi questi stili */
+.octave-controls,
+.octave-btn,
+.octave-select,
+.pattern-transpose,
+.transpose-btn {
+    display: none;
+}
+
+/* ...rest of existing code... */
 

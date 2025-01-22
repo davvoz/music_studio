@@ -9,6 +9,7 @@ export class TB303Render extends AbstractHTMLRender {
         this.container.setAttribute('data-instance-id', this.instanceId);
         this.paramChangeCallback = null;
         this.sequenceChangeCallback = null;
+        this.currentOctaveShift = 0;  // Aggiunto per tenere traccia dello shift di ottava
         this.createInterface();
         this.isSaveMode = false;
         this.isSaving = false;  // Nuovo flag per evitare salvataggi multipli
@@ -37,9 +38,27 @@ export class TB303Render extends AbstractHTMLRender {
                 <div class="knob-wrap pattern-selector">
                     <div class="pattern-buttonsi">
                         <div class="pattern-type">
+                            <select class="key-select">
+                                <option value="C">C</option>
+                                <option value="C#">C#</option>
+                                <option value="D">D</option>
+                                <option value="D#">D#</option>
+                                <option value="E">E</option>
+                                <option value="F">F</option>
+                                <option value="F#">F#</option>
+                                <option value="G">G</option>
+                                <option value="G#">G#</option>
+                                <option value="A">A</option>
+                                <option value="A#">A#</option>
+                                <option value="B">B</option>
+                            </select>
                             <button class="pattern-btn" data-pattern="random">RND</button>
                             <button class="pattern-btn" data-pattern="minor">MIN</button>
                             <button class="pattern-btn" data-pattern="major">MAJ</button>
+                        </div>
+                        <div class="pattern-transpose">
+                            <button class="transpose-btn" data-dir="down">-8va</button>
+                            <button class="transpose-btn" data-dir="up">+8va</button>
                         </div>
                         <div class="pattern-length">
                             <button class="length-btn" data-length="4">4</button>
@@ -70,7 +89,8 @@ export class TB303Render extends AbstractHTMLRender {
             envMod: 'ENV',
             decay: 'DECAY',
             accent: 'ACC',
-            distortion: 'DIST'  // Aggiunto controllo distorsione
+            distortion: 'DIST',
+            octave: 'OCT'  // Aggiunto nuovo knob
         };
 
         const knobsContainer = this.container.querySelector('.tb303-knobs');
@@ -86,6 +106,7 @@ export class TB303Render extends AbstractHTMLRender {
     createKnob(param, label, container) {
         const knobWrapper = document.createElement('div');
         knobWrapper.className = 'knob-wrap';
+        knobWrapper.setAttribute('data-param', param); // Aggiungi questo per lo stile CSS
         knobWrapper.innerHTML = `<div class="knob"></div><span>${label}</span>`;
         container.appendChild(knobWrapper);
 
@@ -97,7 +118,16 @@ export class TB303Render extends AbstractHTMLRender {
             startAngle: 30,
             endAngle: 330,
             numTicks: 11,
-            onChange: (v) => this.paramChangeCallback?.(param, v)
+            onChange: (v) => {
+                if (param === 'octave') {
+                    this.currentOctaveShift = Math.round(v * 4 - 2); // Converti da 0-1 a -2/+2
+                    // Aggiorna tutte le note con la nuova ottava
+                    this.container.querySelectorAll('.step').forEach((step, index) => {
+                        this.sequenceChangeCallback?.(index, this.getStepData(step));
+                    });
+                }
+                this.paramChangeCallback?.(param, v);
+            }
         };
 
         // Configurazioni specifiche per ogni knob
@@ -111,6 +141,10 @@ export class TB303Render extends AbstractHTMLRender {
                 break;
             case 'distortion':
                 config.value = 0.3;
+                break;
+            case 'octave':
+                config.value = 0.5; // Centro (0)
+                config.numTicks = 5;
                 break;
         }
 
@@ -262,11 +296,71 @@ export class TB303Render extends AbstractHTMLRender {
 
         // Attiva il bottone 16 di default
         this.container.querySelector('.length-btn[data-length="16"]').classList.add('active');
+
+        // Aggiungi gli event listener per i pulsanti di trasposizione
+        this.container.querySelectorAll('.transpose-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.transposePattern(btn.dataset.dir);
+                // Feedback visivo
+                btn.classList.add('active');
+                setTimeout(() => btn.classList.remove('active'), 200);
+            });
+        });
+
+        // Aggiungi gestione dei pulsanti ottava
+        this.container.querySelectorAll('.octave-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const direction = btn.dataset.dir;
+                if (this.transposePattern(direction)) {
+                    // Feedback visivo solo se ci sono stati cambiamenti
+                    btn.classList.add('active');
+                    setTimeout(() => btn.classList.remove('active'), 100);
+                }
+            });
+        });
+
+        // Rimuovi questo blocco che causa l'errore
+        /*
+        this.renderer.setParameterChangeCallback((param, value) => {
+            if (param === 'octave') {
+                this.currentOctaveShift = Math.round(value);
+                this.container.querySelectorAll('.step').forEach((step, index) => {
+                    this.sequenceChangeCallback?.(index, this.getStepData(step));
+                });
+            }
+        });
+        */
+
+        // Sostituiscilo con la gestione diretta del callback nel createKnob
+        // Il callback è già gestito qui:
+        /*
+        createKnob(param, label, container) {
+            // ...existing code...
+            config.onChange: (v) => this.paramChangeCallback?.(param, v)
+            // ...existing code...
+        }
+        */
+
     }
 
+    // Modifica il getStepData per usare direttamente currentOctaveShift
     getStepData(step) {
+        const baseNote = step.querySelector('.note').value;
+        if (!baseNote) {
+            return {
+                note: '',
+                accent: step.querySelector('[data-type="accent"]').classList.contains('active'),
+                slide: step.querySelector('[data-type="slide"]').classList.contains('active')
+            };
+        }
+
+        // Usa il valore di ottava dal parametro
+        const noteName = baseNote.slice(0, -1);
+        const originalOctave = parseInt(baseNote.slice(-1));
+        const newOctave = Math.max(0, Math.min(8, originalOctave + this.currentOctaveShift));
+        
         return {
-            note: step.querySelector('.note').value,
+            note: noteName + newOctave,
             accent: step.querySelector('[data-type="accent"]').classList.contains('active'),
             slide: step.querySelector('[data-type="slide"]').classList.contains('active')
         };
@@ -274,16 +368,18 @@ export class TB303Render extends AbstractHTMLRender {
 
     generateRandomPattern(length = 16) {
         this.clearAllSteps();
+        const selectedKey = this.container.querySelector('.key-select').value;
         const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-        const octaves = ['1', '2'];
+        const startIndex = notes.indexOf(selectedKey);
+        const reorderedNotes = [...notes.slice(startIndex), ...notes.slice(0, startIndex)];
         
-        // Prima genera il pattern base della lunghezza richiesta
         const basePattern = [];
         for (let i = 0; i < length; i++) {
             if (Math.random() < 0.7) {
                 basePattern.push({
-                    note: notes[Math.floor(Math.random() * notes.length)] + 
-                          octaves[Math.floor(Math.random() * octaves.length)],
+                    note: (Math.random() < 0.6 ? 
+                          reorderedNotes[Math.floor(Math.random() * 5)] : 
+                          reorderedNotes[Math.floor(Math.random() * reorderedNotes.length)]) + '1',
                     accent: Math.random() < 0.3,
                     slide: Math.random() < 0.2
                 });
@@ -292,7 +388,6 @@ export class TB303Render extends AbstractHTMLRender {
             }
         }
 
-        // Poi applica il pattern ripetendolo per tutti i 32 step
         const steps = this.container.querySelectorAll('.step');
         for (let i = 0; i < 32; i++) {
             const patternStep = basePattern[i % length];
@@ -308,6 +403,7 @@ export class TB303Render extends AbstractHTMLRender {
 
     generateRandomMinorPattern(length = 16) {
         this.clearAllSteps();
+        const selectedKey = this.container.querySelector('.key-select').value;
         // Natural minor scale (Aeolian mode): W-H-W-W-H-W-W
         // Relative to C: C, D, Eb, F, G, Ab, Bb
         const minorScaleNotes = {
@@ -325,18 +421,14 @@ export class TB303Render extends AbstractHTMLRender {
             'B': ['B', 'C#', 'D', 'E', 'F#', 'G', 'A']
         };
 
-        const roots = Object.keys(minorScaleNotes);
-        const root = roots[Math.floor(Math.random() * roots.length)];
-        const scale = minorScaleNotes[root];
-        const octaves = ['1', '2'];
+        const scale = minorScaleNotes[selectedKey];
         
         // Genera il pattern base
         const basePattern = [];
         for (let i = 0; i < length; i++) {
             if (Math.random() < 0.7) {
                 basePattern.push({
-                    note: scale[Math.floor(Math.random() * scale.length)] + 
-                          octaves[Math.floor(Math.random() * octaves.length)],
+                    note: scale[Math.floor(Math.random() * scale.length)] + '1',
                     accent: Math.random() < 0.3,
                     slide: Math.random() < 0.2
                 });
@@ -361,6 +453,7 @@ export class TB303Render extends AbstractHTMLRender {
 
     generateRandomMajorPattern(length = 16) {
         this.clearAllSteps();
+        const selectedKey = this.container.querySelector('.key-select').value;
         // Major scale: W-W-H-W-W-W-H
         const majorScaleNotes = {
             'C': ['C', 'D', 'E', 'F', 'G', 'A', 'B'],
@@ -377,18 +470,14 @@ export class TB303Render extends AbstractHTMLRender {
             'B': ['B', 'C#', 'D#', 'E', 'F#', 'G#', 'A#']
         };
 
-        const roots = Object.keys(majorScaleNotes);
-        const root = roots[Math.floor(Math.random() * roots.length)];
-        const scale = majorScaleNotes[root];
-        const octaves = ['1', '2'];
+        const scale = majorScaleNotes[selectedKey];
         
         // Genera il pattern base
         const basePattern = [];
         for (let i = 0; i < length; i++) {
             if (Math.random() < 0.7) {
                 basePattern.push({
-                    note: scale[Math.floor(Math.random() * scale.length)] + 
-                          octaves[Math.floor(Math.random() * octaves.length)],
+                    note: scale[Math.floor(Math.random() * scale.length)] + '1',
                     accent: (i % 4 === 0) ? Math.random() < 0.5 : Math.random() < 0.2,
                     slide: Math.random() < 0.15
                 });

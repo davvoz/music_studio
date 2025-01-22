@@ -81,6 +81,18 @@ export class TB303 extends AbstractInstrument {
         this.postGain.gain.value = 0.7;  // Volume fisso di output
         
         this.osc.start();
+        
+        this.parameters = {
+            cutoff: 0.5,
+            resonance: 0.7,
+            decay: 0.2,
+            envMod: 0.5,
+            distortion: 0.3,
+            slideTime: 0.055,
+            minDecayTime: 0.03,  // Tempo minimo di decay
+            maxDecayTime: 0.8,   // Tempo massimo di decay
+            octave: 0            // Aggiunto parametro ottava
+        };
     }
 
     // Nuovo metodo per calcolare la frequenza del filtro
@@ -170,6 +182,11 @@ export class TB303 extends AbstractInstrument {
                     break;
                 case 'slideTime':
                     this.slideTime = value * 0.1 + 0.02;
+                    break;
+                case 'octave':
+                    // Il renderer gestisce già la trasposizione delle note
+                    // Qui non serve fare nulla perché le note vengono già 
+                    // trasposte quando vengono inviate attraverso sequenceChangeCallback
                     break;
             }
         });

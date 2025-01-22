@@ -226,7 +226,10 @@ export class DrumMachine extends AbstractInstrument {
 
     loadSavedPattern(slot) {
         const savedPattern = localStorage.getItem(`${this.instanceId}-pattern-${slot}`);
-        if (!savedPattern) return;
+        if (!savedPattern) {
+            console.log('No pattern found in slot:', slot);
+            return;
+        }
 
         try {
             const pattern = JSON.parse(savedPattern);
@@ -238,19 +241,29 @@ export class DrumMachine extends AbstractInstrument {
                     }));
                 }
             });
+
+            // Update the visual representation after loading
+            this.renderer.updateSequenceDisplay(this.sequence);
+            localStorage.setItem(`${this.instanceId}-last-pattern`, slot);
+            console.log('Pattern loaded from slot:', slot);
         } catch (error) {
             console.error('Error loading pattern:', error);
         }
     }
 
     saveCurrentPattern(slot) {
-        const pattern = {};
-        Object.entries(this.sequence).forEach(([drum, steps]) => {
-            pattern[drum] = steps.map(step => 
-                step.active ? (step.velocity > 1 ? 2 : 1) : 0
-            );
-        });
-        localStorage.setItem(`${this.instanceId}-pattern-${slot}`, JSON.stringify(pattern));
-        localStorage.setItem(`${this.instanceId}-last-pattern`, slot);
+        try {
+            const pattern = {};
+            Object.entries(this.sequence).forEach(([drum, steps]) => {
+                pattern[drum] = steps.map(step => 
+                    step.active ? (step.velocity > 1 ? 2 : 1) : 0
+                );
+            });
+            localStorage.setItem(`${this.instanceId}-pattern-${slot}`, JSON.stringify(pattern));
+            localStorage.setItem(`${this.instanceId}-last-pattern`, slot);
+            console.log('Pattern saved to slot:', slot);
+        } catch (error) {
+            console.error('Error saving pattern:', error);
+        }
     }
 }

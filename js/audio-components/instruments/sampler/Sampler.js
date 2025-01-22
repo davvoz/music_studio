@@ -100,20 +100,20 @@ export class Sampler extends AbstractInstrument {
     }
 
     onBeat(beat, time) {
-        // Loop continuo su 32 step
+        // Always loop through all 32 steps
         const stepIndex = beat % 32;
-        if (stepIndex >= this.selectedLength) return;
-
         const step = this.sequence[stepIndex];
-        if (!step?.active || !this.currentSample?.buffer) return;
-
-        this.playSample(
-            step.pitch,
-            step.velocity,
-            step.length,
-            time,
-            step.startOffset
-        );
+        
+        // Play step if active and sample is loaded
+        if (step?.active && this.currentSample?.buffer) {
+            this.playSample(
+                step.pitch,
+                step.velocity,
+                step.length,
+                time,
+                step.startOffset
+            );
+        }
 
         requestAnimationFrame(() => {
             this.renderer.highlightStep?.(stepIndex);
@@ -136,12 +136,12 @@ export class Sampler extends AbstractInstrument {
         source.connect(this.gainNode);
         
         // Aumentato il gain complessivo
-        const finalGain = velocity * this.parameters.gain * 1.5; // Moltiplicatore extra
+        const mainGain = velocity * this.parameters.gain * 1.5; // Moltiplicatore extra
         
         // Imposta il gain con rampa per evitare click
         this.gainNode.gain.cancelScheduledValues(time);
         this.gainNode.gain.setValueAtTime(0, time);
-        this.gainNode.gain.linearRampToValueAtTime(finalGain, time + 0.005);
+        this.gainNode.gain.linearRampToValueAtTime(mainGain, time + 0.005);
         
         // Calcola durata e offset
         const baseDuration = this.currentSample.buffer.duration;
@@ -162,11 +162,26 @@ export class Sampler extends AbstractInstrument {
             source.start(time, actualStart, actualDuration);
             
             // Fade out alla fine per evitare click
-            this.gainNode.gain.setValueAtTime(finalGain, time + actualDuration - 0.005);
+            this.gainNode.gain.setValueAtTime(mainGain, time + actualDuration - 0.005);
             this.gainNode.gain.linearRampToValueAtTime(0, time + actualDuration);
         } catch (error) {
             console.error('Error playing sample:', error);
         }
+
+        // Fix velocity control
+        const gainNode = this.context.createGain();
+        gainNode.connect(this.gainNode);
+        
+        // Calculate final gain with velocity
+        const finalGain = Math.min(1.5, velocity * this.parameters.gain);
+        
+        // Apply gain envelope
+        gainNode.gain.setValueAtTime(0, time);
+        gainNode.gain.linearRampToValueAtTime(finalGain, time + 0.005);
+        gainNode.gain.setValueAtTime(finalGain, time + actualDuration - 0.005);
+        gainNode.gain.linearRampToValueAtTime(0, time + actualDuration);
+        
+        source.connect(gainNode);
     }
 
     updateSequence(step, active, pitch = 0, velocity = 1, length = 1, startOffset = 0) {

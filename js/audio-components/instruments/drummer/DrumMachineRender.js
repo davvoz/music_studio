@@ -43,11 +43,6 @@ export class DrumMachineRender extends AbstractHTMLRender {
                 </div>
                 <div class="drum-knobs"></div>
                 <div class="knob-wrap pattern-selector">
-                    <div class="pattern-buttons">
-                        <button class="pattern-btn" data-pattern="basic">BASIC</button>
-                        <button class="pattern-btn" data-pattern="house">HOUSE</button>
-                        <button class="pattern-btn" data-pattern="break">BREAK</button>
-                    </div>
                     <div class="pattern-memory">
                         <button class="memory-btn" data-slot="1">1</button>
                         <button class="memory-btn" data-slot="2">2</button>
@@ -216,12 +211,9 @@ export class DrumMachineRender extends AbstractHTMLRender {
     }
 
     setupEventListeners() {
-        // Gestione semplice degli eventi senza ottimizzazioni
         this.container.addEventListener('click', (e) => {
             const target = e.target;
-            if (target.closest('.pattern-btn')) {
-                this.handlePatternClick(target.closest('.pattern-btn'));
-            } else if (target.closest('.memory-btn')) {
+            if (target.closest('.memory-btn')) {
                 this.handleMemoryClick(target.closest('.memory-btn'));
             } else if (target.closest('.save-btn')) {
                 this.handleSaveClick(target.closest('.save-btn'));
@@ -245,25 +237,6 @@ export class DrumMachineRender extends AbstractHTMLRender {
         }
     }
 
-    handlePatternClick(patternBtn) {
-        const type = patternBtn.dataset.pattern;
-        requestAnimationFrame(() => {
-            switch(type) {
-                case 'basic':
-                    this.generateBasicPattern();
-                    break;
-                case 'house':
-                    this.generateHousePattern();
-                    break;
-                case 'break':
-                    this.generateBreakPattern();
-                    break;
-            }
-            patternBtn.classList.add('active');
-            setTimeout(() => patternBtn.classList.remove('active'), 200);
-        });
-    }
-
     handleMemoryClick(memoryBtn) {
         if (!memoryBtn) return;
 
@@ -282,6 +255,9 @@ export class DrumMachineRender extends AbstractHTMLRender {
     }
 
     handleSaveMode(btn) {
+        if (this.isSaving) return;  // Prevent multiple saves
+        this.isSaving = true;
+        
         const slot = btn.dataset.slot;
         this.paramChangeCallback?.('savePattern', slot);
         this.isSaveMode = false;
@@ -290,46 +266,17 @@ export class DrumMachineRender extends AbstractHTMLRender {
         btn.classList.add('saved');
         setTimeout(() => {
             btn.classList.remove('saved');
+            this.isSaving = false;
         }, 300);
     }
 
     handleLoadMode(btn) {
         const slot = btn.dataset.slot;
         this.paramChangeCallback?.('loadPattern', slot);
-        requestAnimationFrame(() => {
-            this.container.querySelectorAll('.memory-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-        });
-    }
-
-    generateBasicPattern() {
-        const pattern = {
-            kick:  [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
-            snare: [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0],
-            hihat: [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
-            clap:  [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0]
-        };
-        this.applyPattern(pattern);
-    }
-
-    generateHousePattern() {
-        const pattern = {
-            kick:  [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,1,0, 1,0,0,0, 1,1,0,0],
-            snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,1,1],
-            hihat: [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0, 1,1,1,0, 1,0,1,1, 1,1,1,1],
-            clap:  [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,1]
-        };
-        this.applyPattern(pattern);
-    }
-
-    generateBreakPattern() {
-        const pattern = {
-            kick:  [1,0,0,1, 0,1,0,0, 1,0,1,0, 0,0,1,0, 1,0,0,1, 0,1,0,0, 1,1,0,0, 1,0,1,0],
-            snare: [0,0,1,0, 1,0,0,1, 0,1,0,0, 1,0,0,1, 0,0,1,0, 1,0,0,1, 0,1,1,0, 1,0,0,1],
-            hihat: [1,1,0,1, 1,0,1,1, 0,1,1,0, 1,1,0,1, 1,1,0,1, 1,0,1,1, 1,1,1,0, 1,1,0,1],
-            clap:  [0,0,1,0, 0,1,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0, 0,1,0,1, 0,0,1,0, 1,1,0,0]
-        };
-        this.applyPattern(pattern);
+        
+        // Remove active class from all buttons and add it to the clicked one
+        this.container.querySelectorAll('.memory-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
     }
 
     applyPattern(pattern) {
@@ -445,6 +392,26 @@ export class DrumMachineRender extends AbstractHTMLRender {
                         }
                         this.sequenceChangeCallback?.(drum, targetStep + index, 
                             stepData.active, stepData.velocity);
+                    }
+                });
+            }
+        });
+    }
+
+    updateSequenceDisplay(sequence) {
+        Object.entries(sequence).forEach(([drum, steps]) => {
+            const row = this.container.querySelector(`.drum-row[data-drum="${drum}"]`);
+            if (row) {
+                steps.forEach((step, index) => {
+                    const cell = row.querySelector(`[data-step="${index}"]`);
+                    if (cell) {
+                        cell.classList.remove('active', 'accent');
+                        if (step.active) {
+                            cell.classList.add('active');
+                            if (step.velocity > 1) {
+                                cell.classList.add('accent');
+                            }
+                        }
                     }
                 });
             }
