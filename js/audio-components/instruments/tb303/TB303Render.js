@@ -152,7 +152,276 @@ export class TB303Render extends AbstractHTMLRender {
                 break;
         }
 
-        new Knob(knobWrapper.querySelector('.knob'), config);
+        const knob = new Knob(knobWrapper.querySelector('.knob'), config);
+        // Salva il riferimento al knob
+        this.knobs = this.knobs || new Map();
+        this.knobs.set(param, knob);
+
+        // Aggiungi il bottone per l'envelope
+        const envButton = document.createElement('button');
+        envButton.className = 'env-button';
+        envButton.innerHTML = 'ENV';
+        envButton.setAttribute('data-param', param);
+        knobWrapper.appendChild(envButton);
+
+        envButton.addEventListener('click', () => this.showEnvelopeEditor(param));
+
+        // Sostituisci la creazione del bottone disable con un toggle
+        const toggleEnvBtn = document.createElement('button');
+        toggleEnvBtn.className = 'env-toggle-btn';
+        toggleEnvBtn.textContent = 'On'; // Cambiato da 'Toggle Env' a 'On'
+        toggleEnvBtn.setAttribute('data-active', 'true'); // Stato iniziale attivo
+        
+        toggleEnvBtn.addEventListener('click', () => {
+            const isActive = toggleEnvBtn.getAttribute('data-active') === 'true';
+            const newState = !isActive;
+            
+            toggleEnvBtn.setAttribute('data-active', newState);
+            toggleEnvBtn.textContent = newState ? 'On' : 'Off'; // Testo più corto
+            
+            this.paramChangeCallback?.(`${param}Envelope`, {
+                active: newState,
+                // Non modifichiamo i points esistenti
+                points: undefined, // undefined significa "mantieni i punti esistenti"
+                length: undefined, // undefined significa "mantieni la lunghezza esistente"
+                curve: undefined  // undefined significa "mantieni la curva esistente"
+            });
+        });
+        
+        knobWrapper.appendChild(toggleEnvBtn);
+    }
+
+    updateKnobValue(param, value) {
+        const knob = this.knobs.get(param);
+        if (knob) {
+            knob.setValue(value, true); // true = senza triggare l'evento onChange
+        }
+    }
+
+    showEnvelopeEditor(param) {
+        const modal = document.createElement('div');
+        modal.className = 'envelope-editor-modal';
+        
+        modal.innerHTML = `
+            <div class="envelope-editor-header">
+                <span>${param.toUpperCase()} ENVELOPE</span>
+                <div class="envelope-status"></div>
+            </div>
+            <canvas width="400" height="200"></canvas>
+            <div class="envelope-controls">
+                <div class="length-control">
+                    <label>Length (bars): </label>
+                    <input type="number" min="1" max="32" value="1" class="length-input">
+                </div>
+                <div class="envelope-tools">
+                    <button class="curve-btn" data-curve="linear">Linear</button>
+                    <button class="curve-btn" data-curve="exp">Exp</button>
+                    <button class="curve-btn" data-curve="sine">Sine</button>
+                </div>
+                <button class="clear-btn">Clear</button>
+                <button class="apply-btn">Apply</button>
+                <button class="close-btn">Close</button>
+            </div>
+        `;
+
+        this.container.appendChild(modal);
+        
+        const canvas = modal.querySelector('canvas');
+        const ctx = canvas.getContext('2d');
+        const points = [];
+        let isDragging = false;
+        let currentCurve = 'linear';
+
+        // Aggiungi una variabile per lo stato iniziale
+        let envelopeIsActive = false;
+
+        // Prima definisci tutte le funzioni di disegno
+        const drawGrid = () => {
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 0.5;
+            
+            // Linee orizzontali
+            for (let i = 0; i <= 10; i++) {
+                const y = i * canvas.height / 10;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+            
+            // Linee verticali per le battute
+            const bars = parseInt(modal.querySelector('.length-input').value);
+            for (let i = 0; i <= bars * 4; i++) {
+                const x = i * canvas.width / (bars * 4);
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+        };
+
+        const drawEnvelope = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawGrid();
+            
+            if (points.length < 2) return;
+            
+            ctx.beginPath();
+            ctx.strokeStyle = '#FF9500';
+            ctx.lineWidth = 2;
+            
+            points.sort((a, b) => a.time - b.time);
+            
+            // Disegna curva
+            ctx.moveTo(points[0].time * canvas.width, (1 - points[0].value) * canvas.height);
+            
+            for (let i = 0; i < points.length - 1; i++) {
+                const current = points[i];
+                const next = points[i + 1];
+                
+                if (currentCurve === 'exp') {
+                    ctx.bezierCurveTo(
+                        current.time * canvas.width + 50, (1 - current.value) * canvas.height,
+                        next.time * canvas.width - 50, (1 - next.value) * canvas.height,
+                        next.time * canvas.width, (1 - next.value) * canvas.height
+                    );
+                } else if (currentCurve === 'sine') {
+                    const steps = 20;
+                    for (let j = 0; j <= steps; j++) {
+                        const t = j / steps;
+                        const x = current.time + (next.time - current.time) * t;
+                        const y = current.value + (next.value - current.value) * 
+                                 (0.5 - 0.5 * Math.cos(Math.PI * t));
+                        ctx.lineTo(x * canvas.width, (1 - y) * canvas.height);
+                    }
+                } else {
+                    ctx.lineTo(next.time * canvas.width, (1 - next.value) * canvas.height);
+                }
+            }
+            
+            ctx.stroke();
+            
+            // Disegna punti
+            points.forEach(point => {
+                ctx.beginPath();
+                ctx.arc(
+                    point.time * canvas.width,
+                    (1 - point.value) * canvas.height,
+                    5, 0, Math.PI * 2
+                );
+                ctx.fillStyle = '#FF9500';
+                ctx.fill();
+            });
+        };
+
+        // Ora possiamo usare drawEnvelope nel callback
+        const getEnvelopeCallback = (envelopeState) => {
+            try {
+                if (envelopeState && Array.isArray(envelopeState.points)) {
+                    points.push(...envelopeState.points);
+                    if (envelopeState.length) {
+                        modal.querySelector('.length-input').value = envelopeState.length;
+                    }
+                    envelopeIsActive = envelopeState.active !== false;
+                    drawEnvelope();
+                }
+            } catch (error) {
+                console.warn('Error loading envelope state:', error);
+            }
+        };
+
+        // Richiedi lo stato dell'inviluppo in modo sicuro
+        this.paramChangeCallback?.(`get${param}Envelope`, null, getEnvelopeCallback);
+        
+
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / canvas.width));
+            const y = Math.max(0, Math.min(1, 1 - (e.clientY - rect.top) / canvas.height));
+            
+            points.push({ time: x, value: y });
+            isDragging = true;
+            drawEnvelope();
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / canvas.width));
+            const y = Math.max(0, Math.min(1, 1 - (e.clientY - rect.top) / canvas.height));
+            
+            // Aggiungi punti solo se abbastanza distanti dall'ultimo
+            const lastPoint = points[points.length - 1];
+            const distance = Math.hypot(x - lastPoint.time, y - lastPoint.value);
+            
+            if (distance > 0.01) {  // Soglia minima di distanza
+                points.push({ time: x, value: y });
+                drawEnvelope();
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        modal.querySelector('.apply-btn').addEventListener('click', () => {
+            if (points.length === 0) {
+                console.log('No points to apply');
+                return;
+            }
+
+            const length = parseInt(modal.querySelector('.length-input').value);
+            
+            // Ordina e normalizza i punti
+            const sortedPoints = points
+                .sort((a, b) => a.time - b.time)
+                .map(p => ({
+                    time: Math.max(0, Math.min(1, p.time)),
+                    value: Math.max(0, Math.min(1, p.value))
+                }));
+
+            console.log('Applying envelope:', {
+                param,
+                points: sortedPoints,
+                length
+            });
+
+            this.paramChangeCallback?.(`${param}Envelope`, {
+                points: sortedPoints,
+                length,
+                curve: currentCurve
+            });
+
+            modal.remove();
+        });
+
+        modal.querySelector('.clear-btn').addEventListener('click', () => {
+            points.length = 0;
+            drawEnvelope();
+            // Disattiva l'inviluppo quando si fa clear
+            this.paramChangeCallback?.(`${param}Envelope`, {
+                points: [],
+                length: 1,
+                curve: 'linear',
+                active: false
+            });
+        });
+
+        modal.querySelector('.close-btn').addEventListener('click', () => {
+            modal.remove();
+        });
+
+        modal.querySelectorAll('.curve-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                currentCurve = btn.dataset.curve;
+                modal.querySelectorAll('.curve-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                drawEnvelope();
+            });
+        });
+
+        drawEnvelope();
     }
 
     createCompactSequencer() {

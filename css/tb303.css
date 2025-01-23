@@ -694,3 +694,164 @@
 
 /* ...rest of existing code... */
 
+/* ...existing code... */
+
+.env-button {
+    background: #1E2328;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: 4px;
+    color: #808080;
+    font-size: 10px;
+    padding: 2px 6px;
+    margin-top: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.env-button.active {
+    background: #FF9500;
+    color: #1E2328;
+}
+
+.env-button::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: transparent;
+}
+
+.env-button.has-envelope::after {
+    background: #FF9500;
+}
+
+.env-button:hover {
+    color: #FF9500;
+    border-color: #FF9500;
+}
+
+.envelope-editor-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #1E2328;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+}
+
+.envelope-controls {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+    justify-content: center;
+}
+
+.length-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #FF9500;
+}
+
+.length-input {
+    width: 50px;
+    background: #272B33;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: 4px;
+    color: #FF9500;
+    padding: 4px;
+    text-align: center;
+}
+
+.envelope-controls button {
+    background: #272B33;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: 4px;
+    color: #FF9500;
+    padding: 4px 12px;
+    cursor: pointer;
+}
+
+.envelope-controls button:hover {
+    background: #323841;
+}
+
+/* ...existing code... */
+
+.envelope-editor-header {
+    color: #FF9500;
+    font-size: 14px;
+    font-weight: bold;
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+.envelope-tools {
+    display: flex;
+    gap: 5px;
+}
+
+.curve-btn {
+    background: #1E2328;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: 4px;
+    color: #808080;
+    font-size: 11px;
+    padding: 4px 8px;
+    cursor: pointer;
+}
+
+.curve-btn.active {
+    background: #FF9500;
+    color: #1E2328;
+}
+
+.envelope-editor-modal canvas {
+    background: #272B33;
+    border: 1px solid rgba(255, 149, 0, 0.2);
+    border-radius: 4px;
+    margin-bottom: 15px;
+}
+
+/* ...existing code... */
+
+.env-toggle-btn {
+    background: #1E2328;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: 4px;
+    color: #808080;
+    font-size: 10px;
+    padding: 2px 6px;
+    margin-top: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    width: 60px; /* Larghezza fissa */
+    height: 20px; /* Altezza fissa */
+    display: flex; /* Per centrare il testo */
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.env-toggle-btn[data-active="true"] {
+    background: #FF9500;
+    color: #1E2328;
+    border-color: #FF9500;
+}
+
+.env-toggle-btn[data-active="false"] {
+    background: #2C3137;
+    color: #666;
+    border-color: #444;
+}
+
+/* ...existing code... */
+
