@@ -28,6 +28,7 @@
 }
 
 .instrument-panel {
+    display: flex;
     overflow: hidden;
     transition: all 0.3s ease;
     opacity: 1;

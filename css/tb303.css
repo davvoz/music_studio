@@ -211,17 +211,16 @@
 }
 
 .tb303-mini {
-    background: linear-gradient(45deg, #2C3137, #373D44);
+    
     border-radius: 20px;
     padding: 25px;
-    box-shadow:
-        inset 0 0 30px rgba(0, 0, 0, 0.4),
-        0 10px 20px rgba(0, 0, 0, 0.3);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border: 2px solid #FF9500;
-    box-shadow:
-        0 0 30px rgba(255, 149, 0, 0.1),
-        inset 0 2px 10px rgba(0, 0, 0, 0.5);
+    position: relative;  /* Aggiunto */
+    z-index: 0;         /* Aggiunto */
+    min-width: 800px;  /* Aggiunto - larghezza minima per contenere tutto */
+    width: 100%;       /* Aggiunto */
+    height: auto;      /* Aggiunto */
+    overflow: visible; /* Aggiunto */
 }
 
 .tb303-controls {
@@ -230,11 +229,18 @@
     border-radius: 15px;
     display: flex;
     flex-direction: row;
-    gap: 20px;
+    gap: 30px;
     border: 1px solid rgba(255, 255, 255, 0.05);
     box-shadow:
         inset 0 1px 1px rgba(255, 255, 255, 0.05),
         0 5px 15px rgba(0, 0, 0, 0.2);
+    margin-bottom: 20px;  /* Aggiunge spazio prima del sequencer */
+    flex-wrap: nowrap;      /* Permette il wrap su schermi piccoli */
+    justify-content: flex-start;
+    align-items: flex-start;
+    position: relative;  /* Aggiunto */
+    z-index: 1;         /* Aggiunto */
+    min-height: 160px; /* Aggiunto */
 }
 
 .knob-wrap {
@@ -250,6 +256,84 @@
     -moz-user-select: none;
     -ms-user-select: none;
     border: 1px solid rgba(255, 149, 0, 0.2);
+    position: relative;
+    width: 48px;
+    height: 120px;  /* Aumentato per dare più spazio */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;  /* Aumentato lo spazio tra gli elementi */
+    padding: 8px;
+    position: relative;  /* Aggiunto */
+    z-index: 2;         /* Aggiunto */
+}
+
+.knob-container {
+    position: relative;
+    width: 48px;
+    height: 48px;
+    margin-bottom: 8px;  /* Aggiunto margine sotto il knob */
+}
+
+.knob {
+    width: 100%;
+    height: 100%;
+}
+
+.midi-learn-btn {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(30, 30, 30, 0.9);
+    border: 1px solid #666;
+    color: #999;
+    font-size: 8px;
+    opacity: 0;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;        /* Aumentato */
+}
+
+.knob-container:hover .midi-learn-btn {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.midi-learn-btn.learning {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+    background: rgba(255, 0, 0, 0.8);
+    color: white;
+    animation: pulse 1s infinite;
+}
+
+.midi-learn-btn.mapped {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+    background: rgba(0, 255, 0, 0.8);
+    color: black;
+}
+
+.knob-wrap label {
+    font-size: 10px;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: auto;  /* Spinge la label verso il basso */
+}
+
+@keyframes pulse {
+    0% { transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 0 0 rgba(255,0,0,0.4); }
+    70% { transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 0 6px rgba(255,0,0,0); }
+    100% { transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 0 0 rgba(255,0,0,0); }
 }
 
 /* Rimuovi il :hover */
@@ -266,6 +350,8 @@
     -webkit-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
+    margin-top: auto;  /* Spinge il testo verso il basso */
+    padding-bottom: 4px;
 }
 
 /* Aggiungi stile specifico per il knob dell'ottava */
@@ -278,14 +364,21 @@
 }
 
 .tb303-sequence {
-    margin-top: 25px;
-    background: linear-gradient(to bottom, #1E2328, #272C32);
-    padding: 20px;
-    border-radius: 15px;
+    margin-top: 30px;  /* Ridotto da 40px */
     display: grid;
     grid-template-columns: repeat(8, 1fr);
     gap: 6px;
+    padding: 20px;
+    background: linear-gradient(to bottom, #1E2328, #272C32);
+    border-radius: 15px;
     border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: 
+        inset 0 1px 1px rgba(255, 255, 255, 0.05),
+        0 5px 15px rgba(0, 0, 0, 0.2);
+    position: relative;  /* Aggiunto */
+    z-index: 1;         /* Aggiunto */
+    overflow-x: auto;  /* Aggiunto */
+    overflow-y: visible; /* Aggiunto */
 }
 
 .step {
@@ -333,6 +426,8 @@
     font-size: 11px;
     text-align: center;
     transition: all 0.2s ease;
+    position: relative;
+    z-index: auto;
 }
 
 .note:focus {
@@ -412,18 +507,18 @@
 
 .tb303-knobs {
     display: flex;
-    flex-direction: row;
-    justify-content: space-between;
-    gap: 20px;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 5px;
+    padding: 5px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 4px;
     margin-top: 20px;
+    flex: 1;          /* Aggiunto */
+    min-width: 400px; /* Aggiunto */
 }
 
-.wave-selector {
-    display: flex;
-    gap: 4px;
-    justify-content: center;
-    margin-bottom: 12px;
-}
+
 
 .wave-btn {
     width: 40px;
@@ -449,8 +544,19 @@
     background: #272B33;
 }
 
+
+
 .pattern-selector {
-    min-width: 120px;
+    min-width: 180px;
+    /* max-width: 200px; */
+    /* height: 160px; */
+    display: flex
+;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 8px;
+    position: static;
+    margin-left: auto;
 }
 
 .pattern-section {
@@ -461,11 +567,11 @@
 }
 
 .pattern-buttonsi {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
     gap: 4px;
-    justify-content: center;
-    margin-bottom: 12px;
+    margin-bottom: 4px;
+    position: static;  /* Cambiato da relative */
 }
 
 .pattern-btn {
@@ -477,6 +583,10 @@
     padding: 0;
     cursor: pointer;
     transition: all 0.2s ease;
+    height: 24px;
+    padding: 2px 4px;
+    font-size: 10px;
+    white-space: nowrap;
 }
 
 .pattern-btn:active,
@@ -499,10 +609,13 @@
 /* ...rest of existing code... */
 
 .pattern-memory {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
     gap: 4px;
     justify-content: center;
     margin: 8px 0;
+    margin: 4px 0;
+    position: static;  /* Cambiato da relative */
 }
 
 .memory-btn {
@@ -517,6 +630,10 @@
     padding: 0;
     cursor: pointer;
     transition: all 0.2s ease;
+    width: auto;
+    height: 20px;
+    font-size: 10px;
+    padding: 2px;
 }
 
 .memory-btn.active {
@@ -539,6 +656,9 @@
     display: flex;
     justify-content: center;
     margin-top: 8px;
+    margin-top: auto;  /* Spinge i controlli verso il basso */
+    width: 100%;
+    position: static;  /* Cambiato da relative */
 }
 
 .pattern-actions-wrap {
@@ -550,6 +670,8 @@
     flex-wrap: nowrap;
     align-content: center;
     align-items: flex-start;
+    margin: 0;
+    padding: 0;
 }
 
 .pattern-actions-wrap button {
@@ -575,6 +697,9 @@
     padding: 4px 8px;
     cursor: pointer;
     transition: all 0.2s ease;
+    width: 100%;
+    height: 24px;
+    margin-top: 4px;
 }
 
 @keyframes savingPulse {
@@ -624,12 +749,10 @@
     border: 1px solid #666;
     color: #999;
     cursor: pointer;
-}
-
-.length-btn.active {
-    background: #666;
-    color: white;
-    border-color: #999;
+    height: 20px;
+    width: auto;
+    padding: 2px;
+    font-size: 10px;
 }
 
 
@@ -644,6 +767,12 @@
     font-size: 12px;
     margin-right: 4px;
     cursor: pointer;
+    width: 100%;
+    height: 24px;
+    font-size: 11px;
+    padding: 2px 4px;
+    position: relative;
+    z-index: auto;
 }
 
 .key-select:focus {
@@ -679,9 +808,21 @@
     gap: 4px;
     flex-wrap: wrap;
     justify-content: center;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    display: grid;
+    grid-template-columns: 1fr;  /* Un elemento per riga */
+    gap: 4px;
+    margin-bottom: 4px;
 }
 
-/* ...existing code... */
+.pattern-type .key-select {
+    grid-column: span 2;  /* Occupa tutta la larghezza */
+    width: 100%;
+}
+
+
 
 /* Rimuovi questi stili */
 .octave-controls,
@@ -694,7 +835,7 @@
 
 /* ...rest of existing code... */
 
-/* ...existing code... */
+
 
 .env-button {
     background: #1E2328;
@@ -707,6 +848,9 @@
     cursor: pointer;
     transition: all 0.2s ease;
     position: relative;
+    width: 100%;
+    padding: 3px 6px;
+    margin-bottom: 6px;  /* Aggiunto spazio prima della label */
 }
 
 .env-button.active {
@@ -744,7 +888,7 @@
     border-radius: 8px;
     border: 1px solid rgba(255, 149, 0, 0.3);
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
-    z-index: 1000;
+    z-index: 9999;
 }
 
 .envelope-controls {
@@ -784,7 +928,7 @@
     background: #323841;
 }
 
-/* ...existing code... */
+
 
 .envelope-editor-header {
     color: #FF9500;
@@ -794,25 +938,14 @@
     text-align: center;
 }
 
-.envelope-tools {
-    display: flex;
-    gap: 5px;
-}
-
-.curve-btn {
-    background: #1E2328;
-    border: 1px solid rgba(255, 149, 0, 0.3);
-    border-radius: 4px;
-    color: #808080;
-    font-size: 11px;
-    padding: 4px 8px;
-    cursor: pointer;
-}
-
+/* Rimuovi questi stili */
+.envelope-tools,
+.curve-btn,
 .curve-btn.active {
-    background: #FF9500;
-    color: #1E2328;
+    display: none;
 }
+
+
 
 .envelope-editor-modal canvas {
     background: #272B33;
@@ -821,37 +954,258 @@
     margin-bottom: 15px;
 }
 
-/* ...existing code... */
 
-.env-toggle-btn {
+
+.midi-learn-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    font-size: 10px;
+    padding: 2px 4px;
+    background: #333;
+    color: #999;
+    border: 1px solid #666;
+    border-radius: 3px;
+    cursor: pointer;
+    z-index: 2;
+}
+
+.midi-learn-btn.learning {
+    background: #900;
+    color: white;
+    animation: blink 1s infinite;
+}
+
+.midi-learn-btn.mapped {
+    background: #090;
+    color: white;
+}
+
+@keyframes blink {
+    50% { opacity: 0.5; }
+}
+
+
+
+.knob-controls {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    margin-top: 4px;
+    width: 100%;
+}
+
+.env-button {
+    width: 100%;
+    padding: 4px 8px;
+    font-size: 9px;
     background: #1E2328;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    color: #808080;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 2px;
+}
+
+.env-button:hover {
+    color: #FF9500;
+    border-color: #FF9500;
+}
+
+.env-button.active {
+    background: #FF9500;
+    color: #1E2328;
+}
+
+.env-button.has-envelope {
+    color: #FF9500;
+    border-color: #FF9500;
+}
+
+
+
+.knob-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+    align-items: center;
+    margin-top: 2px;
+}
+
+.env-button {
+    padding: 2px 6px;
+    font-size: 9px;
+    background: #444;
+    border: 1px solid #666;
+    color: #999;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.env-button:hover {
+    background: #555;
+    color: #fff;
+}
+
+.env-button.active {
+    background: #666;
+    color: #fff;
+}
+
+.knob-controls {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+
+.env-button {
+    width: 100%;
+    padding: 4px 8px;
+    font-size: 9px;
+    background: #1E2328;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    color: #808080;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+
+
+.envelope-status {
+    font-size: 10px;
+    color: #666;
+    margin-left: 10px;
+}
+
+.env-button.has-envelope {
+    background: #FF9500;
+    color: #1E2328;
+    border-color: #FF9500;
+    box-shadow: 0 0 10px rgba(255, 149, 0, 0.2);
+}
+
+
+
+
+
+.draw-mode-selector {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 10px;
+}
+
+.draw-mode-btn {
+    background: #2C3137;
     border: 1px solid rgba(255, 149, 0, 0.3);
     border-radius: 4px;
     color: #808080;
-    font-size: 10px;
-    padding: 2px 6px;
-    margin-top: 4px;
+    padding: 4px 12px;
+    font-size: 12px;
     cursor: pointer;
     transition: all 0.2s ease;
-    width: 60px; /* Larghezza fissa */
-    height: 20px; /* Altezza fissa */
-    display: flex; /* Per centrare il testo */
-    align-items: center;
-    justify-content: center;
-    text-align: center;
 }
 
-.env-toggle-btn[data-active="true"] {
+.draw-mode-btn.active {
     background: #FF9500;
     color: #1E2328;
     border-color: #FF9500;
 }
 
-.env-toggle-btn[data-active="false"] {
-    background: #2C3137;
-    color: #666;
-    border-color: #444;
+
+
+.disable-btn {
+    background: #772222 !important;
+    border-color: #aa3333 !important;
 }
 
-/* ...existing code... */
+.disable-btn:hover {
+    background: #993333 !important;
+}
 
+.pattern-buttonsi,
+.pattern-memory,
+.pattern-actions,
+.wave-selector {
+    position: static;
+}
+
+.key-select,
+.note {
+    position: relative;
+    z-index: auto;
+}
+
+.envelope-editor-modal::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: -1;
+}
+
+/* Stile per lo scrolling orizzontale */
+.tb303-sequence::-webkit-scrollbar {
+    height: 8px;
+}
+
+.tb303-sequence::-webkit-scrollbar-track {
+    background: #1E2328;
+    border-radius: 4px;
+}
+
+.tb303-sequence::-webkit-scrollbar-thumb {
+    background: #FF9500;
+    border-radius: 4px;
+}
+
+.tb303-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 20px;
+    background: #1E2328;
+    border-radius: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow:
+        inset 0 1px 1px rgba(255, 255, 255, 0.05),
+        0 5px 15px rgba(0, 0, 0, 0.2);
+    position: relative;
+    z-index: 1;
+    min-height: 400px;
+}
+
+.knob-wrapo {
+    background: #1E2328;
+    border-radius: 12px;
+    box-shadow:
+        8px 8px 16px rgba(0, 0, 0, 0.3),
+        -8px -8px 16px rgba(255, 255, 255, 0.03);
+    transition: transform 0.2s ease;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    border: 1px solid rgba(255, 149, 0, 0.2);
+    position: relative;
+    width: 48px;
+    height: 120px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    position: relative;
+    z-index: 2;
+}

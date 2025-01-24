@@ -567,3 +567,29 @@ body {
     border-color: #f1c40f;
     box-shadow: 0 0 10px rgba(241, 196, 15, 0.3);
 }
+
+/* ...existing code... */
+
+.volume-container {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+}
+
+.volume-container .midi-learn-btn {
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%) scale(0.8);
+    opacity: 0;
+    transition: all 0.2s ease;
+}
+
+.volume-container:hover .midi-learn-btn {
+    opacity: 1;
+    bottom: -25px;
+}
+
+/* ...existing code... */

@@ -3,6 +3,7 @@ import { AbstractAudioComponent } from './AbstractAudioComponent.js';
 import { VUMeter } from '../../components/VUMeter.js';
 import { DelayEffect } from '../effects/DelayEffect.js';
 import { ShaperEffect } from '../effects/ShaperEffect.js';
+import { MIDIMapping } from '../../core/MIDIMapping.js';  // Aggiungi questa importazione
 
 export class AbstractInstrument extends AbstractAudioComponent {
     constructor(context, id) {
@@ -14,6 +15,9 @@ export class AbstractInstrument extends AbstractAudioComponent {
         this.instrumentOutput = this.context.createGain();
         this.rackVolume = context.createGain();
         this.vuMeter = new VUMeter(context);
+        
+        // MIDI mapping
+        this.midiMapping = new MIDIMapping();
         
         // Create effects
         this.delay = new DelayEffect(context);
@@ -53,6 +57,35 @@ export class AbstractInstrument extends AbstractAudioComponent {
         volumeKnob.step = 0.01;
         volumeKnob.value = this.rackVolume.gain.value;
         volumeKnob.className = 'rack-volume';
+
+        // Aggiungi il pulsante MIDI learn
+        const midiLearnBtn = document.createElement('button');
+        midiLearnBtn.className = 'midi-learn-btn';
+        midiLearnBtn.innerHTML = '<span>MIDI</span>';
+        midiLearnBtn.setAttribute('data-param', 'volume');
+
+        let learningTimeout;
+        midiLearnBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            clearTimeout(learningTimeout);
+            
+            const isLearning = midiLearnBtn.classList.toggle('learning');
+            if (isLearning) {
+                this.midiMapping.startLearning('volume');
+                learningTimeout = setTimeout(() => {
+                    midiLearnBtn.classList.remove('learning');
+                    this.midiMapping.stopLearning();
+                }, 10000);
+            } else {
+                this.midiMapping.stopLearning();
+            }
+        });
+        
+        // Volume knob container
+        const volumeContainer = document.createElement('div');
+        volumeContainer.className = 'volume-container';
+        volumeContainer.appendChild(volumeKnob);
+        volumeContainer.appendChild(midiLearnBtn);
         
         volumeKnob.addEventListener('input', (e) => {
             const value = parseFloat(e.target.value);
@@ -60,7 +93,7 @@ export class AbstractInstrument extends AbstractAudioComponent {
             this.vuMeter.setVolume(value);
         });
         
-        mixerSection.appendChild(volumeKnob);
+        mixerSection.appendChild(volumeContainer);
         mixerSection.appendChild(this.vuMeter.getElement());
         
         // Add effects controls
@@ -104,6 +137,18 @@ export class AbstractInstrument extends AbstractAudioComponent {
         this._savedVolume = value;
         if (!this._isMuted) {
             this.rackVolume.gain.setValueAtTime(value, this.context.currentTime);
+        }
+    }
+
+    onMIDIMessage(message) {
+        const result = this.midiMapping.handleMIDIMessage(message);
+        if (result.mapped && result.param === 'volume') {
+            this.setVolume(result.value);
+            // Aggiorna UI
+            const volumeKnob = this.renderer.container.querySelector('.rack-volume');
+            if (volumeKnob) {
+                volumeKnob.value = result.value;
+            }
         }
     }
 }

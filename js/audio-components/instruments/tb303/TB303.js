@@ -1,25 +1,24 @@
 import { AbstractInstrument } from "../../abstract/AbstractInstrument.js";
 import { TB303Render } from "./TB303Render.js";
+import { MIDIMapping } from "../../../core/MIDIMapping.js";  // Aggiungi questa riga
+
+class Envelope {
+    constructor() {
+        this.points = [];
+        this.length = 1;
+        this.active = false;
+    }
+}
 
 export class TB303 extends AbstractInstrument {
     constructor(context) {
         super(context);
-        // Aggiungi ID univoco
+        
+        // Inizializza prima l'ID e le chiavi
         this.instanceId = 'tb303_' + Date.now();
-        // Aggiungi una chiave unica per salvare gli inviluppi
         this.envelopeStorageKey = `tb303_envelopes_${this.instanceId}`;
-        // Passa l'ID al renderer
-        this.renderer = new TB303Render(this.instanceId);
         
-        // Inizializza la sequenza con 32 step vuoti
-        this.sequence = Array(32).fill().map(() => ({
-            note: null,
-            accent: false,
-            slide: false,
-            gate: false
-        }));
-        
-        // Inizializza prima i parametri
+        // Inizializza i parametri PRIMA di creare il renderer
         this.parameters = {
             cutoff: 0.5,
             resonance: 0.7,
@@ -27,34 +26,60 @@ export class TB303 extends AbstractInstrument {
             envMod: 0.5,
             distortion: 0.3,
             slideTime: 0.055,
-            minDecayTime: 0.03,  // Tempo minimo di decay
-            maxDecayTime: 0.8,    // Tempo massimo di decay
-            accent: 0.5,        // Aggiunto
-            glide: 0.5,        // Aggiunto
+            minDecayTime: 0.03,
+            maxDecayTime: 0.8,
+            accent: 0.5,
+            glide: 0.5,
             octave: 0,
-            tempo: 120         // Aggiunto
+            tempo: 120
         };
+
+        // Setup audio dopo i parametri ma prima del renderer
+        this.setupAudio();
         
-        // Variabili di stato
+        // Inizializza altre proprietà necessarie
+        this.sequence = Array(32).fill().map(() => ({
+            note: null,
+            accent: false,
+            slide: false,
+            gate: false
+        }));
+        
         this.currentNoteTime = 0;
         this.decayTime = this.parameters.decay * 0.5 + 0.1;
         this.envModAmount = this.parameters.envMod;
         this.slideTime = this.parameters.slideTime;
         this.lastNoteFrequency = null;
-
-        // Setup dopo l'inizializzazione dei parametri
-        this.setupAudio();
-        this.setupEvents();
-
-        // Aggiungi gestione degli inviluppi
-        this.envelopes = new Map();
-        this.modulationLength = 1; // Lunghezza base in misure
-        this.setupModulationEnvelopes();
+        
+        // Inizializza gli inviluppi
+        this.setupEnvelopes();
         this.lastModulationTime = 0;
         this.modulationStartTime = 0;
+        
+        // MIDI mapping
+        this.midiMapping = new MIDIMapping();
 
-        // Inizializza gli inviluppi dall'eventuale storage
+        // Ora che tutto è inizializzato, crea il renderer
+        this.renderer = new TB303Render(this.instanceId, this);
+        
+        // Setup degli eventi dopo che il renderer è stato creato
+        this.setupEvents();
+        
+        // Carica gli inviluppi salvati
         this.loadEnvelopes();
+
+        // Override onMIDIMessage per gestire sia i messaggi specifici del TB303 che quelli ereditati
+        this.onMIDIMessage = (message) => {
+            // Prima proviamo a gestire il messaggio come un normale strumento
+            super.onMIDIMessage(message);
+            
+            // Poi gestiamo i messaggi specifici del TB303
+            const result = this.midiMapping.handleMIDIMessage(message);
+            if (result.mapped && result.param !== 'volume') { // Ignoriamo volume perché già gestito da super
+                this.updateParameter(result.param, result.value);
+                this.renderer.updateKnobValue(result.param, result.value);
+            }
+        };
     }
 
     setupAudio() {
@@ -145,7 +170,7 @@ export class TB303 extends AbstractInstrument {
             this.renderer.highlightStep?.(stepIndex);
         });
 
-        this.processModulations(time);
+        this.processEnvelopes(time);
     }
 
     clearScheduledValues(time) {
@@ -192,11 +217,9 @@ export class TB303 extends AbstractInstrument {
             if (param.endsWith('Envelope')) {
                 const baseParam = param.replace('Envelope', '');
                 console.log('Attivando modulazione per:', baseParam, value);
-                this.updateModulation(
+                this.updateEnvelope(
                     baseParam, 
-                    value.points, 
-                    value.length, 
-                    value.active !== false
+                    value
                 );
                 return;
             }
@@ -308,7 +331,7 @@ export class TB303 extends AbstractInstrument {
         
             // Set oscillator frequency
             if (slide && this.lastNoteFrequency) {
-                const slideTime = this.slideTime * (this.envelopes.get('glide')?.lastValue || 1);
+                const slideTime = this.slideTime * (this.envelopes.glide?.lastValue || 1);
                 if (isFinite(slideTime) && slideTime > 0) {
                     this.osc.frequency.linearRampToValueAtTime(freq, baseTime + slideTime);
                 } else {
@@ -369,265 +392,194 @@ export class TB303 extends AbstractInstrument {
         }
     }
 
-    setupModulationEnvelopes() {
-        const parameters = ['cutoff', 'resonance', 'envMod', 'decay', 'accent', 'distortion', 'glide'];  // Aggiunto glide
-        
-        parameters.forEach(param => {
-            this.envelopes.set(param, {
-                points: [], // Array di {time, value}
-                active: false,
-                length: this.modulationLength,
-                lastValue: this.parameters[param]
-            });
-        });
+    setupEnvelopes() {
+        this.envelopes = {
+            cutoff: new Envelope(),
+            resonance: new Envelope(),
+            envMod: new Envelope(),
+            decay: new Envelope(),
+            accent: new Envelope(),
+            distortion: new Envelope(),
+            glide: new Envelope()
+        };
     }
 
-    updateModulation(param, points, length, active = true) {
-        console.log('updateModulation:', param, points?.length, length, active);
-        const envelope = this.envelopes.get(param);
-        if (!envelope) {
-            console.warn('No envelope found for:', param);
-            return;
+    updateEnvelope(param, data) {
+        if (!this.envelopes[param]) {
+            this.envelopes[param] = new Envelope();
         }
-
-        try {
-            // Se riceviamo solo l'aggiornamento dello stato active
-            if (points === undefined && length === undefined) {
-                envelope.active = active;
-                // Mantieni tutti gli altri valori invariati
-                this.saveEnvelopes();
+        
+        const env = this.envelopes[param];
+        
+        // Gestisci lo stato active
+        if (typeof data.active === 'boolean') {
+            env.active = data.active;
+            
+            if (!data.active) {
+                // Quando disattiviamo l'envelope:
+                env.points = [];          // Rimuovi i punti
+                env.length = 1;          // Reset della lunghezza
+                // Ripristina il valore originale del parametro
+                this.setParam(param, this.parameters[param]);
+                this.modulationStartTime = 0;  // Reset del tempo di modulazione
                 return;
             }
-
-            if (!active || points.length === 0) {
-                // Reset dell'inviluppo
-                envelope.points = [];
-                envelope.active = false;
-                envelope.lastValue = this.parameters[param]; // Torna al valore base del parametro
-                envelope.length = 1;
-                
-                // Resetta immediatamente il parametro al suo valore di default
-                this.applyModulation(param, this.parameters[param], this.context.currentTime);
-                
-                // Salva lo stato
-                this.saveEnvelopes();
-                return;
-            }
-
-            // Assicurati che i punti siano validi e ordinati
-            const formattedPoints = points
-                .filter(p => p && isFinite(p.time) && isFinite(p.value))
+        }
+    
+        // Aggiorna i punti solo se l'envelope è attivo
+        if (env.active && Array.isArray(data.points)) {
+            env.points = data.points
+                .filter(p => p && typeof p.time === 'number' && typeof p.value === 'number')
                 .map(p => ({
-                    time: Math.max(0, Math.min(1, p.time)),
-                    value: Math.max(0, Math.min(1, p.value))
+                    time: Math.max(0, Math.min(1, parseFloat(p.time))),
+                    value: Math.max(0, Math.min(1, parseFloat(p.value)))
                 }))
                 .sort((a, b) => a.time - b.time);
-
-            // Aggiungi punti di controllo se necessario
-            if (formattedPoints.length === 0) {
-                formattedPoints.push({ time: 0, value: 0.5 }, { time: 1, value: 0.5 });
-            } else if (formattedPoints.length === 1) {
-                formattedPoints.push({ 
-                    time: 1, 
-                    value: formattedPoints[0].value 
-                });
+    
+            if (data.length && data.length > 0) {
+                env.length = parseFloat(data.length);
             }
-
-            // Assicurati che ci sia un punto all'inizio e alla fine
-            if (formattedPoints[0].time > 0) {
-                formattedPoints.unshift({ time: 0, value: formattedPoints[0].value });
-            }
-            if (formattedPoints[formattedPoints.length - 1].time < 1) {
-                formattedPoints.push({
-                    time: 1,
-                    value: formattedPoints[formattedPoints.length - 1].value
-                });
-            }
-
-            envelope.points = formattedPoints;
-            envelope.length = Math.max(1, length || this.modulationLength);
-            envelope.active = true;
-            envelope.lastValue = formattedPoints[0].value;
-
-            // Salva l'inviluppo quando viene aggiornato
-            this.saveEnvelopes();
-
-            console.log('Envelope updated:', {
-                param,
-                active: envelope.active,
-                points: envelope.points,
-                length: envelope.length
-            });
-        } catch (error) {
-            console.error('Error formatting modulation points:', error);
-            envelope.active = false;
+    
+            // Resetta il tempo di inizio quando aggiungiamo nuovi punti
+            this.modulationStartTime = this.context.currentTime;
         }
     }
-
-    processModulations(time) {
-        if (!time || !isFinite(time)) return;
     
-        // Reset cycle if needed
-        if (!this.modulationStartTime || time < this.lastModulationTime) {
-            this.modulationStartTime = time;
-        }
-        this.lastModulationTime = time;
+    processEnvelopes(time) {
+        if (!time) return;
     
-        const currentTime = time - this.modulationStartTime;
-        
-        this.envelopes.forEach((envelope, param) => {
-            if (!envelope.active || envelope.points.length < 2) return;
+        Object.entries(this.envelopes).forEach(([param, env]) => {
+            if (!env.active || !env.points || env.points.length < 2) return;
     
             try {
-                // Calcola la durata in secondi con protezione da NaN
-                const tempo = Math.max(1, this.parameters.tempo || 120); // Protezione da tempo invalido
-                const barDuration = (60 / tempo) * 4;
-                const modulationDuration = barDuration * Math.max(1, envelope.length || 1);
+                // Usa il tempo assoluto dell'AudioContext per la modulazione
+                const absoluteTime = this.context.currentTime;
+                const tempo = this.parameters.tempo || 120;
+                const cycleDuration = env.length * 4 * 60 / tempo;
                 
-                // Assicurati che currentTime e modulationDuration siano validi
-                if (!isFinite(currentTime) || !isFinite(modulationDuration) || modulationDuration <= 0) {
-                    console.warn('Invalid timing values:', { currentTime, modulationDuration });
-                    return;
-                }
+                // Calcola la posizione nel ciclo usando il tempo assoluto
+                const cyclePosition = ((absoluteTime - this.modulationStartTime) % cycleDuration) / cycleDuration;
     
-                // Calcola la posizione nel ciclo con protezione da NaN
-                const cyclePosition = ((currentTime % modulationDuration) / modulationDuration) || 0;
+                // Ordina i punti e assicurati che ci sia sempre un punto a 0 e 1
+                let points = [...env.points].sort((a, b) => a.time - b.time);
                 
-                // Verifica che cyclePosition sia valido
-                if (!isFinite(cyclePosition)) {
-                    console.warn('Invalid cycle position:', cyclePosition);
-                    return;
-                }
+                // Trova i punti di inizio e fine per l'interpolazione
+                let startPoint = points[points.length - 1];
+                let endPoint = points[0];
     
-                // Trova i punti di interpolazione
-                const points = envelope.points;
-                let startPoint = points[0];
-                let endPoint = points[1];
-    
-                // Trova i punti corretti per l'interpolazione
+                // Trova i punti corretti per la posizione attuale
                 for (let i = 0; i < points.length - 1; i++) {
-                    if (points[i].time <= cyclePosition && points[i + 1].time > cyclePosition) {
+                    if (cyclePosition >= points[i].time && cyclePosition < points[i + 1].time) {
                         startPoint = points[i];
                         endPoint = points[i + 1];
                         break;
                     }
                 }
     
-                // Se siamo oltre l'ultimo punto, interpola tra l'ultimo e il primo
+                // Se siamo oltre l'ultimo punto, collega all'inizio del ciclo successivo
                 if (cyclePosition > points[points.length - 1].time) {
                     startPoint = points[points.length - 1];
                     endPoint = points[0];
+                    // Aggiusta la posizione per l'interpolazione tra fine e inizio
+                    const adjustedPosition = (cyclePosition - startPoint.time) / (1 - startPoint.time);
+                    const value = this.interpolateValue(startPoint.value, endPoint.value, adjustedPosition);
+                    this.setParam(param, value);
+                } else {
+                    // Interpolazione normale
+                    const segmentDuration = endPoint.time - startPoint.time;
+                    const segmentPosition = segmentDuration <= 0 ? 0 : 
+                        (cyclePosition - startPoint.time) / segmentDuration;
+                    const value = this.interpolateValue(startPoint.value, endPoint.value, segmentPosition);
+                    this.setParam(param, value);
                 }
     
-                // Calcola il valore interpolato con protezione da errori
-                let interpolatedValue;
-                if (endPoint.time <= startPoint.time) {
-                    const wrapPosition = Math.max(0, Math.min(1, 
-                        (cyclePosition - startPoint.time) / (1 - startPoint.time)
-                    ));
-                    interpolatedValue = startPoint.value + 
-                        (points[0].value - startPoint.value) * wrapPosition;
-                } else {
-                    const segmentLength = endPoint.time - startPoint.time;
-                    if (segmentLength <= 0) {
-                        interpolatedValue = startPoint.value;
-                    } else {
-                        const segmentProgress = (cyclePosition - startPoint.time) / segmentLength;
-                        interpolatedValue = startPoint.value + 
-                            (endPoint.value - startPoint.value) * segmentProgress;
-                    }
-                }
-    
-                // Verifica finale del valore interpolato
-                if (isFinite(interpolatedValue)) {
-                    const normalizedValue = Math.max(0, Math.min(1, interpolatedValue));
-                    this.applyModulation(param, normalizedValue, time);
-                } else {
-                    console.warn('Invalid interpolation for', param, {
-                        startPoint,
-                        endPoint,
+                if (this.debug) {
+                    console.log(`Envelope ${param}:`, {
+                        absoluteTime,
                         cyclePosition,
-                        interpolatedValue
+                        value: this.parameters[param],
+                        startPoint,
+                        endPoint
                     });
                 }
     
             } catch (error) {
-                console.error('Error in modulation processing:', error);
-                envelope.active = false;
+                console.error('Error in envelope processing:', error);
             }
         });
     }
-
-    applyModulation(param, value, time) {
-        if (!isFinite(value) || !isFinite(time)) {
-            console.warn('Invalid modulation values:', { param, value, time });
-            return;
-        }
-        const currentTime = time || this.context.currentTime;
-        const transitionTime = 0.005; // 5ms di transizione per evitare click
     
-        try {
-            // Aggiorna il knob visualmente
+
+    interpolateValue(start, end, pos) {
+        // Assicurati che pos sia tra 0 e 1
+        pos = Math.max(0, Math.min(1, pos));
+        
+        // Interpolazione con curva esponenziale per transizioni più musicali
+        const curve = 0.4;
+        pos = Math.pow(pos, curve) / (Math.pow(pos, curve) + Math.pow(1 - pos, curve));
+        
+        return start + (end - start) * pos;
+    }
+
+    setParam(param, value) {
+        if (!isFinite(value)) return;
+        
+        // Limita il valore tra 0 e 1
+        value = Math.max(0, Math.min(1, value));
+        
+        // Aggiorna il parametro interno
+        this.parameters[param] = value;
+
+        // Applica il valore immediatamente
+        const now = this.context.currentTime;
+        
+        switch(param) {
+            case 'cutoff':
+                const freq = this.calculateCutoffFrequency(value);
+                this.filter.frequency.setValueAtTime(freq, now);
+                break;
+            case 'resonance':
+                this.filter.Q.setValueAtTime(value * 30, now);
+                break;
+            case 'envMod':
+                this.envModAmount = value * 2;
+                break;
+            case 'decay':
+                this.decayTime = this.parameters.minDecayTime +
+                    Math.pow(value, 2) * (this.parameters.maxDecayTime - this.parameters.minDecayTime);
+                break;
+            case 'accent':
+                this.accentGain.gain.setValueAtTime(0.7 + (value * 0.6), now);
+                break;
+            case 'distortion':
+                this.updateDistortion(value);
+                break;
+            case 'glide':
+                this.slideTime = value * 0.2;
+                break;
+        }
+
+        // Aggiorna l'UI (throttled)
+        if (!this.lastUIUpdate || Date.now() - this.lastUIUpdate > 16) {
             requestAnimationFrame(() => {
-                this.renderer.updateKnobValue(param, value);
+                this.renderer?.updateKnobValue?.(param, value);
             });
+            this.lastUIUpdate = Date.now();
+        }
+    }
 
-            switch(param) {
-                case 'cutoff':
-                    const freq = this.calculateCutoffFrequency(value);
-                    this.filter.frequency.linearRampToValueAtTime(freq, currentTime + transitionTime);
-                    break;
-                case 'resonance':
-                    this.filter.Q.linearRampToValueAtTime(value * 30, currentTime + transitionTime);
-                    break;
-                case 'envMod':
-                    this.envModAmount = value * 2;
-                    break;
-                case 'decay':
-                    this.decayTime = this.parameters.minDecayTime + 
-                        (this.parameters.maxDecayTime - this.parameters.minDecayTime) * value;
-                    break;
-                case 'accent':
-                    this.accentGain.gain.linearRampToValueAtTime(
-                        0.7 + (value * 0.6), 
-                        currentTime + transitionTime
-                    );
-                    break;
-                case 'distortion':
-                    this.updateDistortion(value);
-                    break;
-                case 'glide':
-                    this.slideTime = value * 0.2;
-                    break;
+    getCurrentConfig() {
+        return {
+            sequence: this.sequencer.getSequence(),
+            parameters: {
+                cutoff: this.filter.frequency.value,
+                resonance: this.filter.Q.value,
+                envMod: this.envModAmount,
+                decay: this.envelope.decay,
+                accent: this.accentAmount,
+                // ... altri parametri specifici del TB303
             }
-        } catch (error) {
-            console.error(`Error applying modulation for ${param}:`, error);
-        }
-    }
-
-    // Aggiungi questo metodo di debug
-    logModulationState() {
-        this.envelopes.forEach((envelope, param) => {
-            console.log(`${param} modulation:`, {
-                active: envelope.active,
-                points: envelope.points,
-                length: envelope.length,
-                lastValue: envelope.lastValue
-            });
-        });
-    }
-
-    // Aggiungi questo metodo di supporto
-    getInterpolatedValue(startPoint, endPoint, position) {
-        if (!startPoint || !endPoint || !isFinite(position)) return null;
-
-        try {
-            const segmentProgress = Math.max(0, Math.min(1, position));
-            return startPoint.value + (endPoint.value - startPoint.value) * segmentProgress;
-        } catch (error) {
-            console.error('Interpolation error:', error);
-            return null;
-        }
+        };
     }
 
     loadEnvelopes() {
@@ -637,9 +589,9 @@ export class TB303 extends AbstractInstrument {
                 const parsed = JSON.parse(savedEnvelopes);
                 parsed.forEach((env, param) => {
                     if (this.envelopes.has(param)) {
-                        this.envelopes.get(param).points = env.points;
-                        this.envelopes.get(param).length = env.length;
-                        this.envelopes.get(param).active = env.active;
+                        this.envelopes[param].points = env.points;
+                        this.envelopes[param].length = env.length;
+                        this.envelopes[param].active = env.active;
                     }
                 });
             }
@@ -650,13 +602,13 @@ export class TB303 extends AbstractInstrument {
 
     saveEnvelopes() {
         try {
-            const envelopesToSave = Array.from(this.envelopes.entries())
-                .filter(([_, env]) => env.active)
-                .map(([param, env]) => ({
+            const envelopesToSave = Object.keys(this.envelopes)
+                .filter(param => this.envelopes[param].active)
+                .map(param => ({
                     param,
-                    points: env.points,
-                    length: env.length,
-                    active: env.active
+                    points: this.envelopes[param].points,
+                    length: this.envelopes[param].length,
+                    active: this.envelopes[param].active
                 }));
             localStorage.setItem(this.envelopeStorageKey, JSON.stringify(envelopesToSave));
         } catch (error) {
@@ -666,19 +618,17 @@ export class TB303 extends AbstractInstrument {
 
     // Aggiungi un metodo per resettare gli inviluppi
     resetEnvelopes() {
-        this.envelopes.forEach(env => {
+        Object.values(this.envelopes).forEach(env => {
             env.active = false;
             env.points = [];
-            env.lastValue = null;
         });
         localStorage.removeItem(this.envelopeStorageKey);
     }
 
     // Metodo per ottenere lo stato di un inviluppo
     getEnvelopeState(param) {
-        const env = this.envelopes.get(param);
+        const env = this.envelopes[param];
         if (!env) {
-            console.warn('No envelope found for parameter:', param);
             return {
                 active: false,
                 points: [],
@@ -688,8 +638,61 @@ export class TB303 extends AbstractInstrument {
         
         return {
             active: env.active,
-            points: [...(env.points || [])], // Crea una copia dell'array
+            points: env.points || [], // Non clonare l'array per mantenere i riferimenti
             length: env.length || 1
         };
+    }
+
+    // Aggiungi questo metodo per gestire i messaggi MIDI
+    onMIDIMessage(message) {
+        const result = this.midiMapping.handleMIDIMessage(message);
+        if (result.mapped) {
+            if (result.value !== undefined) {
+                this.updateParameter(result.param, result.value);
+                this.renderer.updateKnobValue(result.param, result.value);
+            }
+        }
+    }
+
+    // Aggiungi questo nuovo metodo
+    updateParameter(param, value) {
+        if (!this.parameters[param]) return;
+        
+        this.parameters[param] = value;
+        
+        switch(param) {
+            case 'cutoff':
+                const freq = this.calculateCutoffFrequency(value);
+                this.filter.frequency.setValueAtTime(freq, this.context.currentTime);
+                break;
+            case 'resonance':
+                this.filter.Q.value = value * 30;
+                break;
+            case 'envMod':
+                this.envModAmount = value * 2;
+                break;
+            case 'decay':
+                this.decayTime = this.parameters.minDecayTime + 
+                    Math.pow(value, 2) * (this.parameters.maxDecayTime - this.parameters.minDecayTime);
+                break;
+            case 'accent':
+                this.accentGain.gain.value = 0.7 + (value * 0.6);
+                break;
+            case 'distortion':
+                this.updateDistortion(value);
+                break;
+            case 'glide':
+                this.slideTime = value * 0.2;
+                break;
+            case 'octave':
+                // Limita il valore tra -2 e 2
+                const octaveValue = Math.round(value * 4) - 2;
+                this.parameters.octave = octaveValue;
+                if (this.renderer) {
+                    this.renderer.currentOctaveShift = octaveValue;
+                    this.renderer.updateSequenceOctaves();
+                }
+                break;
+        }
     }
 }

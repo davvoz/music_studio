@@ -3,10 +3,13 @@ import { RenderEngine } from './core/RenderEngine.js';
 import { TB303 } from './audio-components/instruments/tb303/TB303.js';
 import { DrumMachine } from './audio-components/instruments/drummer/DrumMachine.js';
 import { Sampler } from './audio-components/instruments/sampler/Sampler.js';
+import { MIDIManager } from './core/MIDIManager.js';
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     const audioEngine = new AudioEngine();
     const renderEngine = new RenderEngine(audioEngine);
+    const midiManager = new MIDIManager();
+    await midiManager.init();
     
     // Prevent scrolling on touch devices
     document.body.addEventListener('touchmove', (e) => {
@@ -33,4 +36,12 @@ document.addEventListener('DOMContentLoaded', () => {
     audioEngine.addInstrument('drummer', drummer);
     renderEngine.addInstrumentUI('drummer', drummer);
     
+    // Forward MIDI messages to each instrument
+    midiManager.addHandler((message) => {
+        audioEngine.instruments.forEach(inst => {
+            inst.onMIDIMessage?.(message);
+        });
+    });
+
+  
 });

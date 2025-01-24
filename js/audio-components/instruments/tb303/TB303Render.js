@@ -2,9 +2,30 @@ import { AbstractHTMLRender } from "../../abstract/AbstractHTMLRender.js";
 import { Knob } from "../../../components/Knob.js";
 
 export class TB303Render extends AbstractHTMLRender {
-    constructor(instanceId) {
+    constructor(instanceId, tb303Instance) {  // Aggiungi il parametro tb303Instance
         super();
+        
+        if (!instanceId) {
+            throw new Error('instanceId is required');
+        }
+        
+        if (!tb303Instance) {
+            throw new Error('tb303Instance is required');
+        }
+        
+        if (!tb303Instance.parameters || typeof tb303Instance.parameters !== 'object') {
+            console.error('TB303 instance:', tb303Instance);
+            throw new Error('TB303 parameters not properly initialized');
+        }
+
         this.instanceId = instanceId;
+        this.tb303 = tb303Instance;  // Salva il riferimento all'istanza TB303
+        
+        // Verifica che i parametri esistano
+        if (!this.tb303 || !this.tb303.parameters) {
+            throw new Error('TB303 instance or parameters not properly initialized');
+        }
+
         this.container.classList.add('tb303-mini');
         this.container.setAttribute('data-instance-id', this.instanceId);
         this.paramChangeCallback = null;
@@ -17,6 +38,7 @@ export class TB303Render extends AbstractHTMLRender {
         this.updateFrame = null;
         this.eventHandlers = new Map();
         this.setupEventDelegation();
+        this.activeEnvelopeModal = null; // Aggiungi questa proprietà
     }
 
     createInterface() {
@@ -24,7 +46,7 @@ export class TB303Render extends AbstractHTMLRender {
         <div class="tb303-container">
             <div class="tb303-controls">
                 <div class="tb303-knobs"></div>
-                <div class="knob-wrap">
+                <div class="knob-wrapo">
                     <div class="wave-selector">
                         <button class="wave-btn active" data-wave="sawtooth">
                             <svg viewBox="0 0 40 20">
@@ -39,7 +61,7 @@ export class TB303Render extends AbstractHTMLRender {
                     </div>
                     <span>WAVE</span>
                 </div>
-                <div class="knob-wrap pattern-selector">
+                <div class="pattern-selector">
                     <div class="pattern-buttonsi">
                         <div class="pattern-type">
                             <select class="key-select">
@@ -110,85 +132,128 @@ export class TB303Render extends AbstractHTMLRender {
     createKnob(param, label, container) {
         const knobWrapper = document.createElement('div');
         knobWrapper.className = 'knob-wrap';
-        knobWrapper.setAttribute('data-param', param); // Aggiungi questo per lo stile CSS
-        knobWrapper.innerHTML = `<div class="knob"></div><span>${label}</span>`;
-        container.appendChild(knobWrapper);
+        knobWrapper.setAttribute('data-param', param);
 
+        // Crea il container del knob
+        const knobContainer = document.createElement('div');
+        knobContainer.className = 'knob-container';
+
+        // Crea il div per il knob
+        const knobElement = document.createElement('div');
+        knobElement.className = 'knob';
+
+        // Crea il pulsante MIDI learn
+        const midiLearnBtn = document.createElement('button');
+        midiLearnBtn.className = 'midi-learn-btn';
+        midiLearnBtn.innerHTML = '<span>MIDI</span>';
+        midiLearnBtn.setAttribute('data-param', param);
+
+        // Crea i controlli aggiuntivi (tra cui ENV)
+        const controlsWrapper = document.createElement('div');
+        controlsWrapper.className = 'knob-controls';
+
+        // Aggiungi il pulsante ENV
+        const envButton = document.createElement('button');
+        envButton.className = 'env-button';
+        envButton.textContent = 'ENV';
+        envButton.setAttribute('data-param', param);
+
+        // Verifica lo stato iniziale dell'inviluppo
+        const envState = this.tb303.getEnvelopeState(param);
+        if (envState && envState.active) {
+            envButton.classList.add('has-envelope');
+        }
+
+        // Crea la label - SPOSTATO QUI
+        const labelElement = document.createElement('label');
+        labelElement.textContent = label;
+
+        // Assembla la struttura
+        knobContainer.appendChild(knobElement);
+        knobContainer.appendChild(midiLearnBtn);
+        knobWrapper.appendChild(knobContainer);
+        knobWrapper.appendChild(controlsWrapper);  // Aggiungi i controlli
+        controlsWrapper.appendChild(envButton);
+        knobWrapper.appendChild(labelElement);
+
+        // Gestione MIDI learn
+        let learningTimeout;
+        
+        midiLearnBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            
+            clearTimeout(learningTimeout);
+            
+            // Reset altri pulsanti MIDI learn
+            this.container.querySelectorAll('.midi-learn-btn.learning').forEach(btn => {
+                if (btn !== midiLearnBtn) {
+                    btn.classList.remove('learning');
+                    this.tb303.midiMapping.stopLearning();
+                }
+            });
+
+            // Toggle learning mode
+            const isLearning = midiLearnBtn.classList.toggle('learning');
+            
+            if (isLearning) {
+                this.tb303.midiMapping.startLearning(param);
+                
+                // Timeout di sicurezza
+                learningTimeout = setTimeout(() => {
+                    midiLearnBtn.classList.remove('learning');
+                    this.tb303.midiMapping.stopLearning();
+                }, 10000);
+            } else {
+                this.tb303.midiMapping.stopLearning();
+            }
+        });
+
+        // Aggiungi l'event listener per il pulsante ENV
+        envButton.addEventListener('click', () => {
+            this.showEnvelopeEditor(param);
+        });
+
+        // Inizializza il knob
         const config = {
-            min: 0, 
+            min: 0,
             max: 1,
-            value: 0.5,
-            size: 60,
+            value: this.tb303.parameters[param] || 0.5,
+            size: 48,
             startAngle: 30,
             endAngle: 330,
-            numTicks: 11,
-            onChange: (v) => {
-                if (param === 'octave') {
-                    this.currentOctaveShift = Math.round(v * 4 - 2); // Converti da 0-1 a -2/+2
-                    // Aggiorna tutte le note con la nuova ottava
-                    this.container.querySelectorAll('.step').forEach((step, index) => {
-                        this.sequenceChangeCallback?.(index, this.getStepData(step));
-                    });
-                }
-                this.paramChangeCallback?.(param, v);
-            }
+            numTicks: 0,
+            onChange: (v) => this.paramChangeCallback?.(param, v)
         };
 
-        // Configurazioni specifiche per ogni knob
+        // Configura il knob in base al parametro
         switch(param) {
             case 'cutoff':
-                config.startAngle = 30;
-                config.endAngle = 330;
+                config.value = this.tb303.parameters.cutoff;
                 break;
             case 'resonance':
-                config.value = 0.7;
+                config.value = this.tb303.parameters.resonance;
                 break;
             case 'distortion':
-                config.value = 0.3;
+                config.value = this.tb303.parameters.distortion;
                 break;
             case 'octave':
-                config.value = 0.5; // Centro (0)
-                config.numTicks = 5;
+                config.value = 0.5; // Valore centrale (0)
+                config.onChange = (v) => {
+                    const octaveValue = Math.round(v * 4) - 2; // Converte in range -2 to 2
+                    this.currentOctaveShift = octaveValue;
+                    this.paramChangeCallback?.(param, v);
+                    this.updateSequenceOctaves();
+                };
                 break;
         }
 
-        const knob = new Knob(knobWrapper.querySelector('.knob'), config);
-        // Salva il riferimento al knob
+        const knob = new Knob(knobElement, config);
         this.knobs = this.knobs || new Map();
         this.knobs.set(param, knob);
 
-        // Aggiungi il bottone per l'envelope
-        const envButton = document.createElement('button');
-        envButton.className = 'env-button';
-        envButton.innerHTML = 'ENV';
-        envButton.setAttribute('data-param', param);
-        knobWrapper.appendChild(envButton);
-
-        envButton.addEventListener('click', () => this.showEnvelopeEditor(param));
-
-        // Sostituisci la creazione del bottone disable con un toggle
-        const toggleEnvBtn = document.createElement('button');
-        toggleEnvBtn.className = 'env-toggle-btn';
-        toggleEnvBtn.textContent = 'On'; // Cambiato da 'Toggle Env' a 'On'
-        toggleEnvBtn.setAttribute('data-active', 'true'); // Stato iniziale attivo
-        
-        toggleEnvBtn.addEventListener('click', () => {
-            const isActive = toggleEnvBtn.getAttribute('data-active') === 'true';
-            const newState = !isActive;
-            
-            toggleEnvBtn.setAttribute('data-active', newState);
-            toggleEnvBtn.textContent = newState ? 'On' : 'Off'; // Testo più corto
-            
-            this.paramChangeCallback?.(`${param}Envelope`, {
-                active: newState,
-                // Non modifichiamo i points esistenti
-                points: undefined, // undefined significa "mantieni i punti esistenti"
-                length: undefined, // undefined significa "mantieni la lunghezza esistente"
-                curve: undefined  // undefined significa "mantieni la curva esistente"
-            });
-        });
-        
-        knobWrapper.appendChild(toggleEnvBtn);
+        container.appendChild(knobWrapper);
+        return knobWrapper;
     }
 
     updateKnobValue(param, value) {
@@ -199,148 +264,73 @@ export class TB303Render extends AbstractHTMLRender {
     }
 
     showEnvelopeEditor(param) {
+        if (this.activeEnvelopeModal) return;
+
         const modal = document.createElement('div');
         modal.className = 'envelope-editor-modal';
+        this.activeEnvelopeModal = modal;
         
+        // Prima aggiungiamo il modale al DOM
+        this.container.appendChild(modal);
+
+        const envState = this.tb303.getEnvelopeState(param);
+        const isActive = envState.active;
+
+        // Inizializza i punti dall'ultimo stato salvato
+        const points = [...(envState.points || [])];
+
         modal.innerHTML = `
             <div class="envelope-editor-header">
                 <span>${param.toUpperCase()} ENVELOPE</span>
-                <div class="envelope-status"></div>
+                <div class="envelope-status">${isActive ? 'ACTIVE' : 'INACTIVE'}</div>
+            </div>
+            <div class="draw-mode-selector">
+                <button class="draw-mode-btn active" data-mode="points">Points</button>
+                <button class="draw-mode-btn" data-mode="clean">Clean</button>
             </div>
             <canvas width="400" height="200"></canvas>
             <div class="envelope-controls">
                 <div class="length-control">
                     <label>Length (bars): </label>
-                    <input type="number" min="1" max="32" value="1" class="length-input">
-                </div>
-                <div class="envelope-tools">
-                    <button class="curve-btn" data-curve="linear">Linear</button>
-                    <button class="curve-btn" data-curve="exp">Exp</button>
-                    <button class="curve-btn" data-curve="sine">Sine</button>
+                    <input type="number" min="1" max="32" value="${envState.length || 1}" class="length-input">
                 </div>
                 <button class="clear-btn">Clear</button>
                 <button class="apply-btn">Apply</button>
+                <button class="disable-btn">Disable</button>
                 <button class="close-btn">Close</button>
             </div>
         `;
 
-        this.container.appendChild(modal);
-        
         const canvas = modal.querySelector('canvas');
         const ctx = canvas.getContext('2d');
-        const points = [];
         let isDragging = false;
-        let currentCurve = 'linear';
+        let drawMode = 'points'; // Default mode
+        let tempPoints = []; // Per la modalità clean
 
-        // Aggiungi una variabile per lo stato iniziale
-        let envelopeIsActive = false;
-
-        // Prima definisci tutte le funzioni di disegno
-        const drawGrid = () => {
-            ctx.strokeStyle = '#333';
-            ctx.lineWidth = 0.5;
-            
-            // Linee orizzontali
-            for (let i = 0; i <= 10; i++) {
-                const y = i * canvas.height / 10;
-                ctx.beginPath();
-                ctx.moveTo(0, y);
-                ctx.lineTo(canvas.width, y);
-                ctx.stroke();
-            }
-            
-            // Linee verticali per le battute
-            const bars = parseInt(modal.querySelector('.length-input').value);
-            for (let i = 0; i <= bars * 4; i++) {
-                const x = i * canvas.width / (bars * 4);
-                ctx.beginPath();
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, canvas.height);
-                ctx.stroke();
-            }
-        };
-
-        const drawEnvelope = () => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            drawGrid();
-            
-            if (points.length < 2) return;
-            
-            ctx.beginPath();
-            ctx.strokeStyle = '#FF9500';
-            ctx.lineWidth = 2;
-            
-            points.sort((a, b) => a.time - b.time);
-            
-            // Disegna curva
-            ctx.moveTo(points[0].time * canvas.width, (1 - points[0].value) * canvas.height);
-            
-            for (let i = 0; i < points.length - 1; i++) {
-                const current = points[i];
-                const next = points[i + 1];
-                
-                if (currentCurve === 'exp') {
-                    ctx.bezierCurveTo(
-                        current.time * canvas.width + 50, (1 - current.value) * canvas.height,
-                        next.time * canvas.width - 50, (1 - next.value) * canvas.height,
-                        next.time * canvas.width, (1 - next.value) * canvas.height
-                    );
-                } else if (currentCurve === 'sine') {
-                    const steps = 20;
-                    for (let j = 0; j <= steps; j++) {
-                        const t = j / steps;
-                        const x = current.time + (next.time - current.time) * t;
-                        const y = current.value + (next.value - current.value) * 
-                                 (0.5 - 0.5 * Math.cos(Math.PI * t));
-                        ctx.lineTo(x * canvas.width, (1 - y) * canvas.height);
-                    }
-                } else {
-                    ctx.lineTo(next.time * canvas.width, (1 - next.value) * canvas.height);
-                }
-            }
-            
-            ctx.stroke();
-            
-            // Disegna punti
-            points.forEach(point => {
-                ctx.beginPath();
-                ctx.arc(
-                    point.time * canvas.width,
-                    (1 - point.value) * canvas.height,
-                    5, 0, Math.PI * 2
-                );
-                ctx.fillStyle = '#FF9500';
-                ctx.fill();
+        // Gestione modalità di disegno
+        modal.querySelectorAll('.draw-mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                modal.querySelectorAll('.draw-mode-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                drawMode = btn.dataset.mode;
+                points = [];
+                drawEnvelope();
             });
-        };
+        });
 
-        // Ora possiamo usare drawEnvelope nel callback
-        const getEnvelopeCallback = (envelopeState) => {
-            try {
-                if (envelopeState && Array.isArray(envelopeState.points)) {
-                    points.push(...envelopeState.points);
-                    if (envelopeState.length) {
-                        modal.querySelector('.length-input').value = envelopeState.length;
-                    }
-                    envelopeIsActive = envelopeState.active !== false;
-                    drawEnvelope();
-                }
-            } catch (error) {
-                console.warn('Error loading envelope state:', error);
-            }
-        };
-
-        // Richiedi lo stato dell'inviluppo in modo sicuro
-        this.paramChangeCallback?.(`get${param}Envelope`, null, getEnvelopeCallback);
-        
-
+        // Modifica la gestione degli eventi del mouse
         canvas.addEventListener('mousedown', (e) => {
+            isDragging = true;
             const rect = canvas.getBoundingClientRect();
-            const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / canvas.width));
-            const y = Math.max(0, Math.min(1, 1 - (e.clientY - rect.top) / canvas.height));
+            const x = (e.clientX - rect.left) / canvas.width;
+            const y = 1 - (e.clientY - rect.top) / canvas.height;
+            
+            if (drawMode === 'clean') {
+                tempPoints = [];
+                points = [];
+            }
             
             points.push({ time: x, value: y });
-            isDragging = true;
             drawEnvelope();
         });
 
@@ -348,14 +338,13 @@ export class TB303Render extends AbstractHTMLRender {
             if (!isDragging) return;
             
             const rect = canvas.getBoundingClientRect();
-            const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / canvas.width));
-            const y = Math.max(0, Math.min(1, 1 - (e.clientY - rect.top) / canvas.height));
+            const x = (e.clientX - rect.left) / canvas.width;
+            const y = 1 - (e.clientY - rect.top) / canvas.height;
             
-            // Aggiungi punti solo se abbastanza distanti dall'ultimo
-            const lastPoint = points[points.length - 1];
-            const distance = Math.hypot(x - lastPoint.time, y - lastPoint.value);
-            
-            if (distance > 0.01) {  // Soglia minima di distanza
+            if (drawMode === 'clean') {
+                tempPoints.push({ time: x, value: y });
+                drawEnvelope(true);
+            } else {
                 points.push({ time: x, value: y });
                 drawEnvelope();
             }
@@ -363,64 +352,150 @@ export class TB303Render extends AbstractHTMLRender {
 
         canvas.addEventListener('mouseup', () => {
             isDragging = false;
+            if (drawMode === 'clean' && tempPoints.length > 0) {
+                // In modalità clean, usa solo il punto iniziale e finale
+                points = [
+                    tempPoints[0],
+                    tempPoints[tempPoints.length - 1]
+                ];
+                tempPoints = [];
+                drawEnvelope();
+            }
+        });
+
+        const drawEnvelope = (isTemp = false) => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawGrid();
+            
+            if (drawMode === 'clean' && isTemp) {
+                // Disegna una linea temporanea durante il trascinamento
+                if (tempPoints.length >= 2) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = '#FF9500';
+                    ctx.lineWidth = 2;
+                    
+                    ctx.moveTo(tempPoints[0].time * canvas.width, 
+                              (1 - tempPoints[0].value) * canvas.height);
+                              
+                    ctx.lineTo(tempPoints[tempPoints.length - 1].time * canvas.width, 
+                              (1 - tempPoints[tempPoints.length - 1].value) * canvas.height);
+                              
+                    ctx.stroke();
+                }
+            } else if (points.length >= 2) {
+                // Disegna i punti esistenti
+                const sortedPoints = [...points].sort((a, b) => a.time - b.time);
+                
+                ctx.beginPath();
+                ctx.strokeStyle = '#FF9500';
+                ctx.lineWidth = 2;
+                
+                ctx.moveTo(sortedPoints[0].time * canvas.width, 
+                          (1 - sortedPoints[0].value) * canvas.height);
+                
+                if (drawMode === 'clean') {
+                    ctx.lineTo(sortedPoints[1].time * canvas.width, 
+                              (1 - sortedPoints[1].value) * canvas.height);
+                } else {
+                    for (let i = 1; i < sortedPoints.length; i++) {
+                        ctx.lineTo(sortedPoints[i].time * canvas.width, 
+                                 (1 - sortedPoints[i].value) * canvas.height);
+                    }
+                }
+                
+                ctx.stroke();
+
+                // Disegna i punti di controllo solo in modalità points
+                if (drawMode === 'points') {
+                    sortedPoints.forEach(point => {
+                        ctx.beginPath();
+                        ctx.arc(point.time * canvas.width, 
+                               (1 - point.value) * canvas.height, 
+                               5, 0, Math.PI * 2);
+                        ctx.fillStyle = '#FF9500';
+                        ctx.fill();
+                    });
+                }
+            }
+        };
+
+        // Funzioni di disegno
+        const drawGrid = () => {
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 0.5;
+            
+            // Griglia verticale
+            const bars = parseInt(modal.querySelector('.length-input').value);
+            for (let i = 0; i <= bars * 4; i++) {
+                const x = (i / (bars * 4)) * canvas.width;
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            
+            // Griglia orizzontale
+            for (let i = 0; i <= 10; i++) {
+                const y = (i / 10) * canvas.height;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+        };
+
+        // Event listeners bottoni
+        modal.querySelector('.clear-btn').addEventListener('click', () => {
+            points.length = 0;
+            drawEnvelope();
         });
 
         modal.querySelector('.apply-btn').addEventListener('click', () => {
-            if (points.length === 0) {
-                console.log('No points to apply');
+            if (points.length < 2) {
+                alert('Add at least 2 points');
                 return;
             }
 
-            const length = parseInt(modal.querySelector('.length-input').value);
-            
-            // Ordina e normalizza i punti
-            const sortedPoints = points
+            const normalizedPoints = points
                 .sort((a, b) => a.time - b.time)
                 .map(p => ({
                     time: Math.max(0, Math.min(1, p.time)),
                     value: Math.max(0, Math.min(1, p.value))
                 }));
 
-            console.log('Applying envelope:', {
-                param,
-                points: sortedPoints,
-                length
-            });
+            // Assicura punti agli estremi
+            if (normalizedPoints[0].time > 0) {
+                normalizedPoints.unshift({ time: 0, value: normalizedPoints[0].value });
+            }
+            if (normalizedPoints[normalizedPoints.length - 1].time < 1) {
+                normalizedPoints.push({ time: 1, value: normalizedPoints[normalizedPoints.length - 1].value });
+            }
 
             this.paramChangeCallback?.(`${param}Envelope`, {
-                points: sortedPoints,
-                length,
-                curve: currentCurve
+                active: true,
+                points: normalizedPoints,
+                length: parseInt(modal.querySelector('.length-input').value) || 1
             });
 
             modal.remove();
-        });
-
-        modal.querySelector('.clear-btn').addEventListener('click', () => {
-            points.length = 0;
-            drawEnvelope();
-            // Disattiva l'inviluppo quando si fa clear
-            this.paramChangeCallback?.(`${param}Envelope`, {
-                points: [],
-                length: 1,
-                curve: 'linear',
-                active: false
-            });
+            this.activeEnvelopeModal = null;
         });
 
         modal.querySelector('.close-btn').addEventListener('click', () => {
             modal.remove();
+            this.activeEnvelopeModal = null;
         });
 
-        modal.querySelectorAll('.curve-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                currentCurve = btn.dataset.curve;
-                modal.querySelectorAll('.curve-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                drawEnvelope();
-            });
+        // Aggiungi l'event listener per il pulsante Disable
+        modal.querySelector('.disable-btn').addEventListener('click', () => {
+            this.paramChangeCallback?.(`${param}Envelope`, { active: false });
+            const envButton = this.container.querySelector(`.env-button[data-param="${param}"]`);
+            envButton?.classList.remove('has-envelope');
+            modal.remove();
+            this.activeEnvelopeModal = null;
         });
 
+        // Initial draw
         drawEnvelope();
     }
 
@@ -681,7 +756,7 @@ export class TB303Render extends AbstractHTMLRender {
             'G#': ['G#', 'A#', 'B', 'C#', 'D#', 'E', 'F#'],
             'A': ['A', 'B', 'C', 'D', 'E', 'F', 'G'],
             'A#': ['A#', 'C', 'C#', 'D#', 'F', 'F#', 'G#'],
-            'B': ['B', 'C#', 'D', 'E', 'F#', 'G', 'A']
+            'B': ['B', 'C#', 'D#', 'E', 'F#', 'G', 'A']
         };
 
         const scale = minorScaleNotes[selectedKey];
@@ -843,6 +918,16 @@ export class TB303Render extends AbstractHTMLRender {
                 step.querySelector('[data-type="accent"]').classList.toggle('active', stepData.accent);
                 step.querySelector('[data-type="slide"]').classList.toggle('active', stepData.slide);
                 this.sequenceChangeCallback?.(targetStep + index, stepData);
+            }
+        });
+    }
+
+    updateSequenceOctaves() {
+        const steps = this.container.querySelectorAll('.step');
+        steps.forEach((step, index) => {
+            const currentData = this.getStepData(step);
+            if (currentData.note) {
+                this.sequenceChangeCallback?.(index, currentData);
             }
         });
     }
