@@ -10,6 +10,8 @@ export class LooperRender extends AbstractHTMLRender {
         this.ctx = null;
         this.container.classList.add('looper-clip');
         this.createInterface();
+        this.isDragging = false;
+        this.activeMarker = null;
     }
 
     createInterface() {
@@ -36,7 +38,7 @@ export class LooperRender extends AbstractHTMLRender {
                             <option value="16">16 Beats</option>
                         </select>
                         <input type="range" class="pitch-control" 
-                               min="0.5" max="2" step="0.01" value="1"
+                               min="0.25" max="4" step="0.01" value="1"
                                title="Pitch">
                         <span class="pitch-value">1.00x</span>
                     </div>
@@ -44,7 +46,6 @@ export class LooperRender extends AbstractHTMLRender {
                 <div class="waveform-view">
                     <canvas></canvas>
                     <div class="grid"></div>
-                    <div class="playhead"></div>
                     <div class="slice-markers"></div>
                 </div>
             </div>
@@ -111,6 +112,12 @@ export class LooperRender extends AbstractHTMLRender {
         // Draw grid first
         this.drawGrid(this.looper.divisions);
 
+        // Disegna la regione di loop semi-trasparente
+        const loopStartX = width * this.looper.loopStart;
+        const loopEndX = width * this.looper.loopEnd;
+        this.ctx.fillStyle = 'rgba(255, 149, 0, 0.1)';
+        this.ctx.fillRect(loopStartX, 0, loopEndX - loopStartX, height);
+
         // Draw waveform
         this.ctx.beginPath();
         this.ctx.strokeStyle = '#FF9500';
@@ -145,8 +152,12 @@ export class LooperRender extends AbstractHTMLRender {
 
         // Highlight current slice
         if (this.looper.isPlaying && this.looper.currentSlice !== null) {
-            const sliceWidth = width / this.looper.divisions;
-            const sliceX = this.looper.currentSlice * sliceWidth;
+            // Calcola la larghezza della slice considerando la regione di loop
+            const loopWidth = (this.looper.loopEnd - this.looper.loopStart) * width;
+            const sliceWidth = loopWidth / this.looper.divisions;
+            
+            // Calcola la posizione X dello slice corrente
+            const sliceX = loopStartX + (this.looper.currentSlice * sliceWidth);
             
             // Aggiungi un'ombreggiatura per lo slice attivo
             this.ctx.fillStyle = 'rgba(255, 149, 0, 0.3)';
@@ -157,7 +168,7 @@ export class LooperRender extends AbstractHTMLRender {
             this.ctx.lineWidth = 2;
             this.ctx.strokeRect(sliceX, 0, sliceWidth, height);
             
-            // Aggiungi un indicatore numerico dello slice
+            // Aggiorna il testo dello slice con le informazioni della regione
             this.ctx.fillStyle = '#FF9500';
             this.ctx.font = '12px Share Tech Mono';
             this.ctx.textAlign = 'center';
@@ -172,12 +183,17 @@ export class LooperRender extends AbstractHTMLRender {
     drawGrid(divisions) {
         const { width, height } = this.canvas;
         
-        // Draw vertical grid lines
+        // Calcola la regione di loop
+        const loopStartX = width * this.looper.loopStart;
+        const loopEndX = width * this.looper.loopEnd;
+        const loopWidth = loopEndX - loopStartX;
+        
+        // Draw vertical grid lines within loop region
         for (let i = 0; i <= divisions; i++) {
-            const x = (i / divisions) * width;
+            const x = loopStartX + (i / divisions) * loopWidth;
             this.ctx.beginPath();
             this.ctx.strokeStyle = 'rgba(255, 149, 0, 0.2)';
-            this.ctx.lineWidth = i % 4 === 0 ? 2 : 1; // Linee più spesse ogni 4 divisioni
+            this.ctx.lineWidth = i % 4 === 0 ? 2 : 1;
             this.ctx.moveTo(x, 0);
             this.ctx.lineTo(x, height);
             this.ctx.stroke();
@@ -312,15 +328,8 @@ export class LooperRender extends AbstractHTMLRender {
     }
 
     updatePlayhead(position) {
-        const playhead = this.container.querySelector('.playhead');
-        if (playhead && this.looper.originalDuration) {
-            const percent = (position / this.looper.originalDuration) * 100;
-            playhead.style.left = `${percent}%`;
-        }
-
-        requestAnimationFrame(() => {
-            this.drawWaveform(); // Ridisegna tutto per mostrare la posizione corrente
-        });
+        // Usa solo il drawWaveform per l'aggiornamento visuale
+        requestAnimationFrame(() => this.drawWaveform());
     }
 
     updateCurrentSlice(sliceIndex) {

@@ -12,7 +12,7 @@ export class Looper extends AbstractInstrument {
         this.isPlaying = false;
         
         // Parametri di divisione
-        this.divisions = 32; // Default a 32 divisioni
+        this.divisions = 32;
         this.currentSlice = 0;
         this.sliceDuration = 0;
         this.waveformData = null;
@@ -21,11 +21,9 @@ export class Looper extends AbstractInstrument {
         this.startTime = 0;
         this.startOffset = 0;
 
-        // Aggiungi parametri per la lunghezza della slice
-        this.sliceLength = 4; // Default: 4 beats per slice
-        this.beatDuration = 60 / this.tempo; // durata di un beat in secondi
-
-        this.pitch = 1.0; // Default pitch value
+        this.sliceLength = 4;
+        this.beatDuration = 60 / this.tempo;
+        this.pitch = 1.0;
     }
 
     async loadFile(file) {
@@ -57,36 +55,22 @@ export class Looper extends AbstractInstrument {
 
     updateSliceDuration() {
         if (this.buffer) {
-            // Proteggi i calcoli della durata
             try {
-                const totalBeats = this.divisions * this.sliceLength;
-                const tempoInSeconds = 60 / this.tempo;
-                const totalDuration = tempoInSeconds * totalBeats;
-                
-                // Verifica che i valori siano finiti e validi
-                if (isFinite(totalDuration) && totalDuration > 0) {
-                    this.sliceDuration = totalDuration / this.divisions;
-                } else {
-                    console.warn('Invalid duration calculation:', {
-                        totalBeats,
-                        tempoInSeconds,
-                        totalDuration
-                    });
-                    // Usa un valore di fallback basato sulla durata del buffer
-                    this.sliceDuration = this.buffer.duration / this.divisions;
-                }
+                // Calcola semplicemente la durata di ogni slice
+                this.sliceDuration = this.buffer.duration / this.divisions;
             } catch (error) {
                 console.warn('Error calculating slice duration:', error);
-                // Fallback sicuro
                 this.sliceDuration = this.buffer.duration / this.divisions;
             }
         }
     }
 
     onBeat(beat) {
-        // Calcola quale slice suonare in base al beat corrente
-        const beatsPerSlice = this.sliceLength;
-        const slice = Math.floor((beat % (this.divisions * beatsPerSlice)) / beatsPerSlice);
+        if (!this.buffer) return;
+
+        // Normalizza il beat in base alla lunghezza della slice
+        const beatInPattern = beat % (this.divisions * this.sliceLength);
+        const slice = Math.floor(beatInPattern / this.sliceLength);
         
         if (slice !== this.currentSlice) {
             this.currentSlice = slice;
@@ -98,40 +82,48 @@ export class Looper extends AbstractInstrument {
         if (!this.buffer || !this.isPlaying) return;
         
         try {
-            // Ferma il source precedente se esiste e sta suonando
+            // Cleanup precedente source
             if (this.source) {
-                try {
-                    if (this.source.playbackState === 'playing') {
-                        this.source.stop();
-                    }
-                    this.source.disconnect();
-                } catch (error) {
-                    console.log('Source cleanup error:', error);
-                }
+                this.source.stop();
+                this.source.disconnect();
             }
 
-            // Semplifica la riproduzione rimuovendo l'envelope
             this.source = this.context.createBufferSource();
             this.source.buffer = this.buffer;
-            this.source.connect(this.instrumentOutput);
-
-            // Applica il pitch
             this.source.playbackRate.value = this.pitch;
+            this.source.connect(this.instrumentOutput); // <-- Questa riga mancava!
 
-            const now = this.context.currentTime;
             const startTime = sliceIndex * this.sliceDuration;
-            const maxDuration = this.buffer.duration - startTime;
-            const safeDuration = Math.min(this.sliceDuration, maxDuration);
-
-            this.source.start(now, startTime, safeDuration);
+            const safeDuration = Math.min(this.sliceDuration, this.buffer.duration - startTime);
             
-            // Aggiorna l'indice dello slice corrente e notifica il renderer
+            this.source.start(this.context.currentTime, startTime, safeDuration);
             this.currentSlice = sliceIndex;
             this.renderer.updateCurrentSlice(sliceIndex);
-
         } catch (error) {
             console.error('Error playing slice:', error);
         }
+    }
+
+    playFullSample() {
+        if (!this.buffer) return;
+        this.isPlaying = true;
+
+        // Ferma e disconnette eventuali source precedenti
+        if (this.source) {
+            try {
+                this.source.stop();
+                this.source.disconnect();
+            } catch (error) {
+                console.log('Source cleanup error:', error);
+            }
+        }
+
+        // Crea una nuova sorgente e riproduce l'intero buffer
+        this.source = this.context.createBufferSource();
+        this.source.buffer = this.buffer;
+        this.source.playbackRate.value = this.pitch;
+        this.source.connect(this.instrumentOutput);
+        this.source.start(this.context.currentTime, 0, this.buffer.duration);
     }
 
     generateWaveformData(samples = 1000) {
@@ -180,6 +172,7 @@ export class Looper extends AbstractInstrument {
     }
 
     onTransportStop() {
-        this.stop();
+        // Rimuovi la chiamata a this.stop() se vuoi lasciar suonare il campione
+        // this.stop();
     }
 }
