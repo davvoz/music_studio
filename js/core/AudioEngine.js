@@ -113,6 +113,13 @@ export class AudioEngine {
         } else {
             this.startPlayback();
         }
+
+        // Notifica tutti gli strumenti
+        this.instruments.forEach((instrument) => {
+            if (typeof instrument.onTransportStart === 'function') {
+                instrument.onTransportStart();
+            }
+        });
     }
 
     startPlayback() {
@@ -128,6 +135,14 @@ export class AudioEngine {
         this.currentBeat = 0;
         this.timerWorker.postMessage("stop");
         this.instruments.forEach(instrument => instrument.allNotesOff?.());
+
+        // Notifica tutti gli strumenti
+        this.instruments.forEach(instrument => {
+            instrument.allNotesOff?.();
+            if (typeof instrument.onTransportStop === 'function') {
+                instrument.onTransportStop();
+            }
+        });
     }
 
     processTick() {

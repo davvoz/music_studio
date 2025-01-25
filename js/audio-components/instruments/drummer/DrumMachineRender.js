@@ -42,14 +42,14 @@ export class DrumMachineRender extends AbstractHTMLRender {
                     </div>
                 </div>
                 <div class="drum-knobs"></div>
-                <div class="knob-wrap pattern-selector">
+                <div class="pattern-selectore">
                     <div class="pattern-memory">
                         <button class="memory-btn" data-slot="1">1</button>
                         <button class="memory-btn" data-slot="2">2</button>
                         <button class="memory-btn" data-slot="3">3</button>
                         <button class="memory-btn" data-slot="4">4</button>
                     </div>
-                    <div class="pattern-actions">
+                    <div class="pattern-actionse">
                         <button class="save-btn">SAVE</button>
                     </div>
                     <span>PATTERN</span>

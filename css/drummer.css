@@ -233,9 +233,16 @@
     color: #FF9500;
 }
 
-.pattern-selector {
-    min-width: 120px;
-    margin-top: 20px;
+.pattern-selectore {
+    display: flex
+;
+    gap: 4px;
+    justify-content: center;
+    margin-bottom: 12px;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-content: flex-start;
+    align-items: flex-start;
 }
 
 .pattern-buttons {
@@ -287,6 +294,11 @@
     padding: 4px 8px;
     cursor: pointer;
     transition: all 0.2s ease;
+    /*dimensione del pulsante fisso*/
+    width: 100px;
+    text-align: center;
+    margin: 0 auto;
+
 }
 
 .pattern-btn:active,

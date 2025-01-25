@@ -4,6 +4,7 @@ import { TB303 } from './audio-components/instruments/tb303/TB303.js';
 import { DrumMachine } from './audio-components/instruments/drummer/DrumMachine.js';
 import { Sampler } from './audio-components/instruments/sampler/Sampler.js';
 import { MIDIManager } from './core/MIDIManager.js';
+import { Looper } from './audio-components/instruments/looper/Looper.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
     const audioEngine = new AudioEngine();
@@ -35,6 +36,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const drummer = new DrumMachine(audioEngine.context);
     audioEngine.addInstrument('drummer', drummer);
     renderEngine.addInstrumentUI('drummer', drummer);
+    
+    // Add option for Looper in instrument selection
+    const looper = new Looper(audioEngine.context);
+    audioEngine.addInstrument('looper', looper);
+    renderEngine.addInstrumentUI('looper', looper);
     
     // Forward MIDI messages to each instrument
     midiManager.addHandler((message) => {
