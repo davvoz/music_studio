@@ -1,3 +1,5 @@
+import { MIDIMapping } from './MIDIMapping.js';  // Add this import at the top
+
 export class AudioEngine {
     constructor() {
         // Add buffer size adjustment
@@ -9,6 +11,7 @@ export class AudioEngine {
         this.instruments = new Map();
         this.masterOutput = this.context.createGain();
         this.masterOutput.connect(this.context.destination);
+        this.masterOutput.gain.value = 0.8; // Default master volume
         
         // Timing properties
         this.tempo = 120;
@@ -169,6 +172,9 @@ export class AudioEngine {
                 })
                 .catch(err => console.warn('MIDI not available:', err));
         }
+
+        // Add master MIDI mapping
+        this.masterMIDIMapping = new MIDIMapping();
     }
 
     setupAudioResume() {
@@ -448,9 +454,47 @@ export class AudioEngine {
         });
     }
 
-    // Semplifica la gestione MIDI temporaneamente
     handleMIDIMessage(message) {
-        // Per ora lasciamo vuoto, lo implementeremo dopo
+        // First check master mapping
+        const masterResult = this.masterMIDIMapping.handleMIDIMessage(message);
+        if (masterResult.mapped && masterResult.param === 'volume') {
+            console.log('Master volume MIDI control:', masterResult.value);
+            
+            // Applica il valore con rampa per evitare click
+            const now = this.context.currentTime;
+            this.masterOutput.gain.linearRampToValueAtTime(masterResult.value, now + 0.01);
+            
+            // Dispatch events for UI updates con il valore corretto
+            window.dispatchEvent(new CustomEvent('masterVolumeChange', {
+                detail: { value: masterResult.value }
+            }));
+            window.dispatchEvent(new CustomEvent('masterMIDIMappingChanged', {
+                detail: { hasMapping: true }
+            }));
+            return;
+        }
+
+        // Then handle instrument mappings
+        this.instruments.forEach(instrument => {
+            if (instrument.onMIDIMessage) {
+                instrument.onMIDIMessage(message);
+            }
+        });
+    }
+
+    // Add method to get master MIDI mappings
+    getMasterMIDIMappings() {
+        return this.masterMIDIMapping.getMappings();
+    }
+
+    // Add method to restore master MIDI mappings
+    setMasterMIDIMappings(mappings) {
+        this.masterMIDIMapping.setMappings(mappings);
+    }
+
+    // Add method to clear master MIDI mapping
+    clearMasterMIDIMapping(param) {
+        this.masterMIDIMapping.clearMapping(param);
     }
 
     // Debug helper

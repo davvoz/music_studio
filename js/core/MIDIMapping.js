@@ -1,87 +1,77 @@
 export class MIDIMapping {
     constructor() {
         this.mappings = new Map();
-        this.learningCallback = null;
-        this.currentParameter = null;
-        this.isLearning = false;
+        this.learningParam = null;
     }
 
     startLearning(param) {
+        console.log('Starting MIDI learning for:', param);
         this.learningParam = param;
-        console.log('MIDI Learning started for:', param);
     }
 
     stopLearning() {
+        console.log('Stopping MIDI learning');
         this.learningParam = null;
     }
 
     handleMIDIMessage(message) {
-        const [status, cc, value] = message.data;
+        const [status, data1, data2] = message.data;
         
-        // Gestisci solo Control Change messages
-        if ((status & 0xF0) === 0xB0) {
-            const channel = status & 0xF;
-            
-            // Se siamo in modalità learning
-            if (this.learningParam) {
-                console.log('Mapping:', {
+        // Log per debug
+        console.log('MIDI message:', {status, data1, data2});
+
+        // Se siamo in modalità learning
+        if (this.learningParam) {
+            // Accetta solo Control Change messages (0xB0)
+            if ((status & 0xF0) === 0xB0) {
+                console.log('Learning new mapping:', {
                     param: this.learningParam,
-                    cc: cc,
-                    channel: channel
+                    control: data1
+                });
+                this.mappings.set(this.learningParam, {
+                    control: data1,
+                    channel: status & 0x0F
+                });
+                this.learningParam = null;
+                return { mapped: true, param: this.learningParam, value: data2 / 127 };
+            }
+            return { mapped: false };
+        }
+
+        // Gestione normale dei messaggi MIDI
+        for (const [param, mapping] of this.mappings.entries()) {
+            if ((status & 0xF0) === 0xB0 && // Control Change
+                data1 === mapping.control && 
+                (status & 0x0F) === mapping.channel) {
+                
+                console.log('Handling MIDI control:', {
+                    param,
+                    value: data2 / 127
                 });
                 
-                this.mappings.set(`${channel}_${cc}`, this.learningParam);
-                const mappedParam = this.learningParam;
-                this.learningParam = null;
-                return { mapped: true, param: mappedParam };
-            }
-            
-            // Altrimenti controlla se il controllo è mappato
-            const param = this.mappings.get(`${channel}_${cc}`);
-            if (param) {
                 return {
                     mapped: true,
                     param: param,
-                    value: value / 127
+                    value: data2 / 127
                 };
             }
         }
-        
+
         return { mapped: false };
     }
 
-    clearMapping(param) {
-        for (const [key, value] of this.mappings.entries()) {
-            if (value === param) {
-                this.mappings.delete(key);
-            }
-        }
-    }
-
-    getMappingForParam(param) {
-        for (const [key, value] of this.mappings.entries()) {
-            if (value === param) {
-                const [channel, cc] = key.split('_');
-                return { channel: parseInt(channel), cc: parseInt(cc) };
-            }
-        }
-        return null;
-    }
-
-    // Nuovo metodo per ottenere tutte le mappature
     getMappings() {
-        const mappingsObject = {};
-        this.mappings.forEach((value, key) => {
-            mappingsObject[key] = value;
-        });
-        return mappingsObject;
+        return Object.fromEntries(this.mappings);
     }
 
-    // Nuovo metodo per impostare le mappature da un oggetto
-    setMappings(mappingsObject) {
+    setMappings(mappings) {
         this.mappings.clear();
-        Object.entries(mappingsObject).forEach(([key, value]) => {
-            this.mappings.set(key, value);
-        });
+        for (const [param, mapping] of Object.entries(mappings)) {
+            this.mappings.set(param, mapping);
+        }
+    }
+
+    clearMapping(param) {
+        this.mappings.delete(param);
     }
 }

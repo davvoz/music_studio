@@ -19,6 +19,13 @@ export class LooperRender extends AbstractHTMLRender {
             <div class="looper-clip">
                 <div class="clip-header">
                     <div class="clip-info">
+                        <div class="sound-selector">
+                            <select class="sound-select" title="Select sound">
+                                <option value="">No sounds loaded</option>
+                            </select>
+                            <button class="add-sound-btn" title="Add new sound">+</button>
+                            <button class="remove-sound-btn" title="Remove sound">-</button>
+                        </div>
                         <div class="clip-title">No clip loaded</div>
                         <div class="clip-status"></div>
                     </div>
@@ -108,6 +115,51 @@ export class LooperRender extends AbstractHTMLRender {
             this.looper.setPitch(value);
         });
 
+        // Aggiungi gestione dei suoni
+        const soundSelect = this.container.querySelector('.sound-select');
+        soundSelect.addEventListener('change', (e) => {
+            const soundName = e.target.value;
+            if (soundName) {
+                this.looper.loadSound(soundName);
+            }
+        });
+
+        const addSoundBtn = this.container.querySelector('.add-sound-btn');
+        addSoundBtn.addEventListener('click', () => {
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = 'audio/*';
+            fileInput.style.display = 'none';
+            this.container.appendChild(fileInput);
+            
+            fileInput.onchange = async (e) => {
+                if (e.target.files[0]) {
+                    const file = e.target.files[0];
+                    const name = file.name.replace(/\.[^/.]+$/, "");
+                    await this.looper.addSound(name, file);
+                }
+                fileInput.remove();
+            };
+            
+            fileInput.click();
+        });
+
+        const removeSoundBtn = this.container.querySelector('.remove-sound-btn');
+        removeSoundBtn.addEventListener('click', () => {
+            const soundName = this.container.querySelector('.sound-select').value;
+            if (soundName && confirm(`Remove sound "${soundName}"?`)) {
+                this.looper.removeSound(soundName);
+                this.updateSoundsList(Array.from(this.looper.sounds.keys()));
+            }
+        });
+
+        // Salva la configurazione quando i controlli vengono modificati
+        const saveConfig = () => this.looper.saveCurrentConfig();
+        this.container.querySelector('.divisions-select').addEventListener('change', saveConfig);
+        this.container.querySelector('.slice-length-select').addEventListener('change', saveConfig);
+        this.container.querySelector('.pitch-control').addEventListener('input', saveConfig);
+        this.container.querySelector('.start-step-select').addEventListener('change', saveConfig);
+
         this.setupKeyboardShortcuts();
         this.setupSlicePreview();
     }
@@ -116,18 +168,36 @@ export class LooperRender extends AbstractHTMLRender {
         const resizeCanvas = () => {
             const container = this.canvas.parentElement;
             const rect = container.getBoundingClientRect();
-            this.canvas.width = rect.width;
-            this.canvas.height = rect.height;
-            this.canvas.style.width = '100%';  // Forza la larghezza al 100%
-            this.canvas.style.height = '100%'; // Forza l'altezza al 100%
             
-            if (this.looper.waveformData) {
-                this.drawWaveform();
+            // Verifica se le dimensioni sono effettivamente cambiate
+            if (this.canvas.width !== rect.width || this.canvas.height !== rect.height) {
+                this.canvas.width = rect.width;
+                this.canvas.height = rect.height;
+                this.canvas.style.width = '100%';
+                this.canvas.style.height = '100%';
+                
+                // Pulisci il canvas prima di ridisegnare
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                if (this.looper.waveformData) {
+                    this.drawWaveform();
+                }
             }
         };
 
+        // Chiama resizeCanvas immediatamente
         resizeCanvas();
-        new ResizeObserver(resizeCanvas).observe(this.canvas.parentElement);
+
+        // Usa ResizeObserver per monitorare i cambiamenti di dimensione
+        const resizeObserver = new ResizeObserver(() => {
+            requestAnimationFrame(resizeCanvas);
+        });
+        resizeObserver.observe(this.canvas.parentElement);
+
+        // Aggiungi anche un listener per il resize della finestra
+        window.addEventListener('resize', () => {
+            requestAnimationFrame(resizeCanvas);
+        });
     }
 
     drawWaveform() {
@@ -143,71 +213,54 @@ export class LooperRender extends AbstractHTMLRender {
         // Draw grid first
         this.drawGrid(this.looper.divisions);
 
-        // Disegna la regione di loop semi-trasparente
-        const loopStartX = width * this.looper.loopStart;
-        const loopEndX = width * this.looper.loopEnd;
-        this.ctx.fillStyle = 'rgba(255, 149, 0, 0.1)';
-        this.ctx.fillRect(loopStartX, 0, loopEndX - loopStartX, height);
-
-        // Draw waveform
-        this.ctx.beginPath();
-        this.ctx.strokeStyle = '#FF9500';
-        this.ctx.lineWidth = 2;
-
         const data = this.looper.waveformData;
-        const step = width / data.length;
-        const middle = height / 2;
+        const sliceWidth = width / this.looper.divisions;
 
-        // Disegna parte superiore
-        data.forEach((value, i) => {
-            const x = i * step;
-            const y = middle - (value * height/2);
-            if (i === 0) {
-                this.ctx.moveTo(x, y);
-            } else {
+        // Disegna ogni slice separatamente
+        for (let i = 0; i < this.looper.divisions; i++) {
+            const isMuted = this.looper.sliceSettings[i]?.muted;
+            const startX = i * sliceWidth;
+            const samplesPerSlice = Math.floor(data.length / this.looper.divisions);
+            const sliceStart = i * samplesPerSlice;
+            
+            this.ctx.beginPath();
+            this.ctx.strokeStyle = isMuted ? 'rgba(255, 149, 0, 0.3)' : '#FF9500';
+            this.ctx.lineWidth = 2;
+
+            const middle = height / 2;
+            const step = sliceWidth / samplesPerSlice;
+
+            // Disegna la forma d'onda superiore
+            for (let j = 0; j < samplesPerSlice; j++) {
+                const value = data[sliceStart + j];
+                const x = startX + (j * step);
+                const y = middle - (value * height/2);
+                if (j === 0) {
+                    this.ctx.moveTo(x, y);
+                } else {
+                    this.ctx.lineTo(x, y);
+                }
+            }
+
+            // Disegna la forma d'onda inferiore (specchio)
+            for (let j = samplesPerSlice - 1; j >= 0; j--) {
+                const value = data[sliceStart + j];
+                const x = startX + (j * step);
+                const y = middle + (value * height/2);
                 this.ctx.lineTo(x, y);
             }
-        });
 
-        // Disegna parte inferiore (specchio)
-        for (let i = data.length - 1; i >= 0; i--) {
-            const x = i * step;
-            const y = middle + (data[i] * height/2);
-            this.ctx.lineTo(x, y);
+            this.ctx.closePath();
+            this.ctx.fillStyle = isMuted ? 'rgba(255, 149, 0, 0.1)' : 'rgba(255, 149, 0, 0.2)';
+            this.ctx.fill();
+            this.ctx.stroke();
         }
-
-        this.ctx.closePath();
-        this.ctx.fillStyle = 'rgba(255, 149, 0, 0.2)';
-        this.ctx.fill();
-        this.ctx.stroke();
 
         // Highlight current slice
         if (this.looper.isPlaying && this.looper.currentSlice !== null) {
-            // Calcola la larghezza della slice considerando la regione di loop
-            const loopWidth = (this.looper.loopEnd - this.looper.loopStart) * width;
-            const sliceWidth = loopWidth / this.looper.divisions;
-            
-            // Calcola la posizione X dello slice corrente
-            const sliceX = loopStartX + (this.looper.currentSlice * sliceWidth);
-            
-            // Aggiungi un'ombreggiatura per lo slice attivo
+            const sliceX = this.looper.currentSlice * sliceWidth;
             this.ctx.fillStyle = 'rgba(255, 149, 0, 0.3)';
             this.ctx.fillRect(sliceX, 0, sliceWidth, height);
-            
-            // Aggiungi bordi luminosi allo slice attivo
-            this.ctx.strokeStyle = '#FF9500';
-            this.ctx.lineWidth = 2;
-            this.ctx.strokeRect(sliceX, 0, sliceWidth, height);
-            
-            // Aggiorna il testo dello slice con le informazioni della regione
-            this.ctx.fillStyle = '#FF9500';
-            this.ctx.font = '12px Share Tech Mono';
-            this.ctx.textAlign = 'center';
-            this.ctx.fillText(
-                `${this.looper.currentSlice + 1}/${this.looper.divisions}`,
-                sliceX + sliceWidth/2,
-                20
-            );
         }
     }
 
@@ -349,6 +402,16 @@ export class LooperRender extends AbstractHTMLRender {
         }
         
         if (waveformData) {
+            // Forza il ridimensionamento del canvas prima di disegnare
+            const container = this.canvas.parentElement;
+            const rect = container.getBoundingClientRect();
+            this.canvas.width = rect.width;
+            this.canvas.height = rect.height;
+            
+            // Pulisci completamente il canvas
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            
+            // Ora disegna la nuova forma d'onda
             this.drawWaveform();
         }
     }
@@ -405,6 +468,66 @@ export class LooperRender extends AbstractHTMLRender {
     setupSlicePreview() {
         const slicePreview = this.container.querySelector('.slice-preview');
         const waveformView = this.container.querySelector('.waveform-view');
+        const sliceMarkers = this.container.querySelector('.slice-markers');
+        
+        // Aggiorna i marker delle slice per includere i controlli
+        const updateSliceMarkers = () => {
+            sliceMarkers.innerHTML = '';
+            for (let i = 0; i < this.looper.divisions; i++) {
+                const marker = document.createElement('div');
+                marker.className = 'slice-marker';
+                marker.style.left = `${(i / this.looper.divisions) * 100}%`;
+                marker.style.width = `${100 / this.looper.divisions}%`;
+                
+                if (this.looper.sliceSettings[i]?.muted) {
+                    marker.classList.add('muted');
+                }
+                
+                const controls = document.createElement('div');
+                controls.className = 'slice-controls';
+                controls.innerHTML = `
+                    <button class="copy-btn" title="Copy Slice">C</button>
+                    <button class="mute-btn ${this.looper.sliceSettings[i]?.muted ? 'active' : ''}" title="Mute Slice">M</button>
+                    <button class="paste-btn" title="Paste Slice">P</button>
+                `;
+                
+                const muteBtn = controls.querySelector('.mute-btn');
+                const copyBtn = controls.querySelector('.copy-btn');
+                const pasteBtn = controls.querySelector('.paste-btn');
+                
+                muteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.looper.toggleSliceMute(i);
+                    muteBtn.classList.toggle('active');
+                    marker.classList.toggle('muted');
+                });
+                
+                copyBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.looper.copySlice(i);
+                    copyBtn.classList.add('active');
+                    setTimeout(() => copyBtn.classList.remove('active'), 200);
+                });
+                
+                pasteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.looper.pasteSlice(i);
+                    pasteBtn.classList.add('active');
+                    setTimeout(() => pasteBtn.classList.remove('active'), 200);
+                });
+                
+                marker.appendChild(controls);
+                sliceMarkers.appendChild(marker);
+            }
+        };
+
+        // Aggiorna i marker quando cambiano le divisioni
+        this.container.querySelector('.divisions-select').addEventListener('change', () => {
+            requestAnimationFrame(updateSliceMarkers);
+        });
+        
+        // Inizializza i marker
+        updateSliceMarkers();
         
         waveformView.addEventListener('mousemove', (e) => {
             if (!this.looper.buffer) return;
@@ -462,6 +585,30 @@ export class LooperRender extends AbstractHTMLRender {
                 statusElement.textContent = '';
                 statusElement.classList.remove('error');
             }, 5000);
+        }
+    }
+
+    updateSoundsList(soundNames) {
+        const select = this.container.querySelector('.sound-select');
+        select.innerHTML = soundNames.length ? 
+            soundNames.map(name => `<option value="${name}">${name}</option>`).join('') :
+            '<option value="">No sounds loaded</option>';
+        select.value = this.looper.currentSoundName || '';
+    }
+
+    updateControls(config) {
+        this.container.querySelector('.divisions-select').value = config.divisions;
+        this.container.querySelector('.slice-length-select').value = config.sliceLength;
+        this.container.querySelector('.pitch-control').value = config.pitch;
+        this.container.querySelector('.start-step-select').value = config.startingStep;
+        this.container.querySelector('.pitch-value').textContent = `${config.pitch.toFixed(2)}x`;
+    }
+
+    updatePlayButton(isPlaying) {
+        const playBtn = this.container.querySelector('.play-btn');
+        if (playBtn) {
+            playBtn.textContent = isPlaying ? 'Stop' : 'Play';
+            playBtn.classList.toggle('active', isPlaying);
         }
     }
 }

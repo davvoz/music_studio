@@ -31,6 +31,21 @@ export class Looper extends AbstractInstrument {
         this.currentBeat = 0;
         this.beatsPerSlice = 1;
         this.nextSliceTime = 0;
+
+        // Aggiunta della gestione dei suoni multipli
+        this.sounds = new Map(); // Map di {name: string, buffer: AudioBuffer, config: Object}
+        this.currentSoundName = null;
+
+        this.sliceSettings = []; // Array di oggetti {muted: boolean}
+        this.initializeSliceSettings();
+
+        this.clipboardSlice = null; // Per memorizzare la slice copiata
+    }
+
+    initializeSliceSettings() {
+        this.sliceSettings = Array(this.divisions).fill().map(() => ({
+            muted: false
+        }));
     }
 
     async loadFile(file) {
@@ -49,8 +64,95 @@ export class Looper extends AbstractInstrument {
         }
     }
 
+    async addSound(name, file, config = {}) {
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const buffer = await this.context.decodeAudioData(arrayBuffer);
+            
+            this.sounds.set(name, {
+                buffer,
+                config: {
+                    divisions: config.divisions || this.divisions,
+                    sliceLength: config.sliceLength || this.sliceLength,
+                    pitch: config.pitch || this.pitch,
+                    startingStep: config.startingStep || this.startingStep
+                }
+            });
+            
+            if (!this.currentSoundName) {
+                this.loadSound(name);
+            }
+            
+            this.renderer.updateSoundsList(Array.from(this.sounds.keys()));
+            return true;
+        } catch (error) {
+            console.error('Error adding sound:', error);
+            return false;
+        }
+    }
+
+    loadSound(name) {
+        const sound = this.sounds.get(name);
+        if (!sound) return false;
+
+        const wasPlaying = this.isPlaying;
+        this.stop();
+        
+        this.buffer = sound.buffer;
+        this.currentSoundName = name;
+        
+        // Carica la configurazione salvata
+        this.divisions = sound.config.divisions;
+        this.sliceLength = sound.config.sliceLength;
+        this.pitch = sound.config.pitch;
+        this.startingStep = sound.config.startingStep;
+        
+        this.updateSliceDuration();
+        
+        // Rigenera i dati della forma d'onda con il nuovo buffer
+        this.generateWaveformData();
+        
+        // Forza un aggiornamento completo del display
+        requestAnimationFrame(() => {
+            this.renderer.updateDisplay(name, this.buffer.duration, this.waveformData);
+            this.renderer.updateControls(sound.config);
+            
+            // Riprendi la riproduzione se era attiva
+            if (wasPlaying) {
+                this.play();
+                this.renderer.updatePlayButton(true);
+            }
+        });
+        
+        return true;
+    }
+
+    saveCurrentConfig() {
+        if (!this.currentSoundName) return;
+        
+        const sound = this.sounds.get(this.currentSoundName);
+        if (sound) {
+            sound.config = {
+                divisions: this.divisions,
+                sliceLength: this.sliceLength,
+                pitch: this.pitch,
+                startingStep: this.startingStep
+            };
+        }
+    }
+
+    removeSound(name) {
+        if (this.currentSoundName === name) {
+            this.stop();
+            this.buffer = null;
+            this.currentSoundName = null;
+        }
+        return this.sounds.delete(name);
+    }
+
     setDivisions(num) {
         this.divisions = num;
+        this.initializeSliceSettings();
         this.updateSliceDuration();
         this.currentSlice = 0; // Reset current slice
     }
@@ -93,25 +195,30 @@ export class Looper extends AbstractInstrument {
         }
     }
 
+    toggleSliceMute(sliceIndex) {
+        if (sliceIndex >= 0 && sliceIndex < this.sliceSettings.length) {
+            this.sliceSettings[sliceIndex].muted = !this.sliceSettings[sliceIndex].muted;
+        }
+    }
+
     playSliceAtTime(sliceIndex, time) {
-        if (!this.buffer || !this.isPlaying) return;
+        if (!this.buffer || !this.isPlaying || this.sliceSettings[sliceIndex].muted) return;
         
         try {
             const source = this.context.createBufferSource();
             source.buffer = this.buffer;
-            source.playbackRate.value = this.pitch;
-            
             const sliceStart = (sliceIndex * this.buffer.duration) / this.divisions;
             const sliceDuration = (this.buffer.duration / this.divisions);
+            
+            source.playbackRate.value = this.pitch;
             
             const gainNode = this.context.createGain();
             gainNode.connect(this.instrumentOutput);
             source.connect(gainNode);
             
-            const fadeDuration = 0.002;
             gainNode.gain.setValueAtTime(0, time);
-            gainNode.gain.linearRampToValueAtTime(1, time + fadeDuration);
-            gainNode.gain.setValueAtTime(1, time + sliceDuration - fadeDuration);
+            gainNode.gain.linearRampToValueAtTime(1, time + 0.002);
+            gainNode.gain.setValueAtTime(1, time + sliceDuration - 0.002);
             gainNode.gain.linearRampToValueAtTime(0, time + sliceDuration);
             
             source.start(time, sliceStart, sliceDuration);
@@ -140,6 +247,11 @@ export class Looper extends AbstractInstrument {
 
             this.source = this.context.createBufferSource();
             this.source.buffer = this.buffer;
+            
+            const sliceStart = (sliceIndex * this.buffer.duration) / this.divisions;
+            const sliceDuration = (this.buffer.duration / this.divisions);
+            
+            // Imposta il pitch
             this.source.playbackRate.value = this.pitch;
             
             const gainNode = this.context.createGain();
@@ -151,15 +263,18 @@ export class Looper extends AbstractInstrument {
             
             gainNode.gain.setValueAtTime(0, startTime);
             gainNode.gain.linearRampToValueAtTime(1, startTime + fadeTime);
-            gainNode.gain.setValueAtTime(1, startTime + this.sliceDuration - fadeTime);
-            gainNode.gain.linearRampToValueAtTime(0, startTime + this.sliceDuration);
+            gainNode.gain.setValueAtTime(1, startTime + sliceDuration - fadeTime);
+            gainNode.gain.linearRampToValueAtTime(0, startTime + sliceDuration);
 
-            const sliceStart = sliceIndex * this.sliceDuration;
-            const safeDuration = Math.min(this.sliceDuration, this.buffer.duration - sliceStart);
+            this.source.start(startTime, sliceStart, sliceDuration);
             
-            this.source.start(startTime, sliceStart, safeDuration);
             this.currentSlice = sliceIndex;
             this.renderer.updateCurrentSlice(sliceIndex);
+
+            this.source.onended = () => {
+                this.source.disconnect();
+                gainNode.disconnect();
+            };
         } catch (error) {
             console.error('Error playing slice:', error);
         }
@@ -230,5 +345,66 @@ export class Looper extends AbstractInstrument {
     }
 
     onTransportStop() {
+    }
+
+    copySlice(sliceIndex) {
+        if (!this.buffer || sliceIndex >= this.divisions) return;
+        
+        const sliceStart = (sliceIndex * this.buffer.duration) / this.divisions;
+        const sliceDuration = this.buffer.duration / this.divisions;
+        
+        // Crea un nuovo AudioBuffer per la slice
+        const sampleRate = this.buffer.sampleRate;
+        const numberOfChannels = this.buffer.numberOfChannels;
+        const sliceSamples = Math.floor(sliceDuration * sampleRate);
+        
+        const sliceBuffer = this.context.createBuffer(
+            numberOfChannels,
+            sliceSamples,
+            sampleRate
+        );
+        
+        // Copia i dati audio per ogni canale
+        for (let channel = 0; channel < numberOfChannels; channel++) {
+            const channelData = this.buffer.getChannelData(channel);
+            const sliceData = sliceBuffer.getChannelData(channel);
+            const startSample = Math.floor(sliceStart * sampleRate);
+            
+            for (let i = 0; i < sliceSamples; i++) {
+                sliceData[i] = channelData[startSample + i];
+            }
+        }
+        
+        this.clipboardSlice = {
+            buffer: sliceBuffer,
+            muted: this.sliceSettings[sliceIndex].muted
+        };
+    }
+
+    pasteSlice(targetIndex) {
+        if (!this.clipboardSlice || !this.buffer || targetIndex >= this.divisions) return;
+        
+        const targetStart = (targetIndex * this.buffer.duration) / this.divisions;
+        const sampleRate = this.buffer.sampleRate;
+        const startSample = Math.floor(targetStart * sampleRate);
+        
+        // Copia i dati audio dalla slice copiata al buffer principale
+        for (let channel = 0; channel < this.buffer.numberOfChannels; channel++) {
+            const sourceData = this.clipboardSlice.buffer.getChannelData(channel);
+            const targetData = this.buffer.getChannelData(channel);
+            
+            for (let i = 0; i < sourceData.length; i++) {
+                if (startSample + i < targetData.length) {
+                    targetData[startSample + i] = sourceData[i];
+                }
+            }
+        }
+        
+        // Copia le impostazioni
+        this.sliceSettings[targetIndex].muted = this.clipboardSlice.muted;
+        
+        // Aggiorna la visualizzazione
+        this.generateWaveformData();
+        this.renderer?.drawWaveform();
     }
 }

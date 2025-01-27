@@ -294,6 +294,10 @@ export class RenderEngine {
                 console.error(`Error loading instrument ${inst.type}:`, error);
             }
         }
+
+        if (project.masterMIDIMappings) {
+            this.audioEngine.setMasterMIDIMappings(project.masterMIDIMappings);
+        }
     }
 
     getInstrumentClass(type) {
@@ -373,18 +377,228 @@ export class RenderEngine {
         const mixer = document.createElement('div');
         mixer.className = 'mixer-section';
         
+        // Create master section container
+        const masterSection = document.createElement('div');
+        masterSection.className = 'master-section';
+        
+        // Add draggable functionality
+        let isDragging = false;
+        let currentX;
+        let currentY;
+        let initialX;
+        let initialY;
+        let xOffset = 0;
+        let yOffset = 0;
+
+        // Load saved position from localStorage
+        const savedPosition = localStorage.getItem('masterPosition');
+        if (savedPosition) {
+            const { x, y } = JSON.parse(savedPosition);
+            xOffset = x;
+            yOffset = y;
+            masterSection.style.transform = `translate(${x}px, ${y}px)`;
+        }
+
+        const dragStart = (e) => {
+            if (e.target.closest('.master-fader') || e.target.closest('.midi-learn-btnn')) return;
+            
+            if (e.type === "touchstart") {
+                initialX = e.touches[0].clientX - xOffset;
+                initialY = e.touches[0].clientY - yOffset;
+            } else {
+                initialX = e.clientX - xOffset;
+                initialY = e.clientY - yOffset;
+            }
+            
+            if (e.target === masterSection || e.target.closest('.master-section')) {
+                isDragging = true;
+                masterSection.style.cursor = 'grabbing';
+            }
+        };
+
+        const dragEnd = () => {
+            if (!isDragging) return;
+            
+            initialX = currentX;
+            initialY = currentY;
+            isDragging = false;
+            masterSection.style.cursor = 'grab';
+            
+            // Save position to localStorage
+            localStorage.setItem('masterPosition', JSON.stringify({
+                x: xOffset,
+                y: yOffset
+            }));
+        };
+
+        const drag = (e) => {
+            if (!isDragging) return;
+            
+            e.preventDefault();
+            
+            if (e.type === "touchmove") {
+                currentX = e.touches[0].clientX - initialX;
+                currentY = e.touches[0].clientY - initialY;
+            } else {
+                currentX = e.clientX - initialX;
+                currentY = e.clientY - initialY;
+            }
+
+            xOffset = currentX;
+            yOffset = currentY;
+            
+            masterSection.style.transform = `translate(${currentX}px, ${currentY}px)`;
+        };
+
+        // Add event listeners
+        masterSection.addEventListener('touchstart', dragStart, { passive: false });
+        masterSection.addEventListener('touchend', dragEnd, { passive: false });
+        masterSection.addEventListener('touchmove', drag, { passive: false });
+        masterSection.addEventListener('mousedown', dragStart);
+        document.addEventListener('mousemove', drag);
+        document.addEventListener('mouseup', dragEnd);
+        
+        // Create title
+        const masterTitle = document.createElement('h3');
+        masterTitle.textContent = 'MASTER';
+        masterSection.appendChild(masterTitle);
+
+        // Create fader container
+        const faderContainer = document.createElement('div');
+        faderContainer.className = 'master-fader-container';
+
+        // Create master fader
         const masterFader = document.createElement('input');
         masterFader.type = 'range';
+        masterFader.className = 'master-fader';
         masterFader.min = 0;
         masterFader.max = 1;
         masterFader.step = 0.01;
         masterFader.value = 0.8;
-        masterFader.onInput = (e) => {
-            this.audioEngine.masterOutput.gain.value = e.target.value;
-        };
+        
+        // Create value display
+        const valueDisplay = document.createElement('div');
+        valueDisplay.className = 'master-value-display';
+        valueDisplay.textContent = '0.8';
 
-        mixer.appendChild(masterFader);
+        // Add MIDI learn button
+        const midiLearnBtn = document.createElement('button');
+        midiLearnBtn.className = 'midi-learn-btnn';
+        midiLearnBtn.textContent = 'MIDI Learn';  // Cambia il testo per essere più chiaro
+        midiLearnBtn.setAttribute('data-param', 'masterVolume');
+
+        let learningTimeout;
+        midiLearnBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            clearTimeout(learningTimeout);
+            
+            const isLearning = midiLearnBtn.classList.toggle('learning');
+            if (isLearning) {
+                this.audioEngine.masterMIDIMapping.startLearning('volume');
+                learningTimeout = setTimeout(() => {
+                    midiLearnBtn.classList.remove('learning');
+                    this.audioEngine.masterMIDIMapping.stopLearning();
+                }, 10000);
+            } else {
+                this.audioEngine.masterMIDIMapping.stopLearning();
+            }
+        });
+
+        // Aggiungi l'evento per aggiornare il pulsante quando cambia il mapping
+        window.addEventListener('masterMIDIMappingChanged', (e) => {
+            midiLearnBtn.classList.toggle('has-mapping', e.detail.hasMapping);
+        });
+
+        masterFader.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            this.audioEngine.masterOutput.gain.value = value;
+            valueDisplay.textContent = value.toFixed(2);
+        });
+
+        // Create VU meter canvas
+        const vuMeter = document.createElement('canvas');
+        vuMeter.className = 'master-vu-meter';
+        vuMeter.width = 30;
+        vuMeter.height = 200;
+
+        faderContainer.append(masterFader, valueDisplay, midiLearnBtn);
+        masterSection.append(faderContainer, vuMeter);
+        mixer.appendChild(masterSection);
         this.container.appendChild(mixer);
+
+        // Setup VU meter
+        this.setupMasterVUMeter(vuMeter);
+
+        // Aggiungi event listener per aggiornare il display del volume
+        window.addEventListener('masterVolumeChange', (e) => {
+            const value = e.detail.value;
+            masterFader.value = value;
+            valueDisplay.textContent = value.toFixed(2);
+        });
+
+        masterFader.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            this.audioEngine.masterOutput.gain.setValueAtTime(value, this.audioEngine.context.currentTime);
+            valueDisplay.textContent = value.toFixed(2);
+        });
+    }
+
+    setupMasterVUMeter(canvas) {
+        const ctx = canvas.getContext('2d');
+        const analyser = this.audioEngine.context.createAnalyser();
+        this.audioEngine.masterOutput.connect(analyser);
+        analyser.fftSize = 1024;
+        
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Float32Array(bufferLength);
+        
+        const drawVU = () => {
+            requestAnimationFrame(drawVU);
+            analyser.getFloatTimeDomainData(dataArray);
+            
+            // Calculate RMS
+            let rms = 0;
+            for (let i = 0; i < bufferLength; i++) {
+                rms += dataArray[i] * dataArray[i];
+            }
+            rms = Math.sqrt(rms / bufferLength);
+            
+            // Convert to dB
+            const db = 20 * Math.log10(Math.max(rms, 0.0000001));
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw background
+            ctx.fillStyle = '#262626';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Calculate meter height
+            const meterHeight = Math.max(0, canvas.height * (1 + db/60));
+            
+            // Create gradient
+            const gradient = ctx.createLinearGradient(0, canvas.height, 0, 0);
+            gradient.addColorStop(0, '#4CAF50');   // Green
+            gradient.addColorStop(0.6, '#FFC107'); // Yellow
+            gradient.addColorStop(0.8, '#FF9800'); // Orange
+            gradient.addColorStop(1, '#F44336');   // Red
+            
+            // Draw meter
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, canvas.height - meterHeight, canvas.width, meterHeight);
+            
+            // Draw scale lines
+            ctx.strokeStyle = '#ffffff33';
+            ctx.beginPath();
+            for(let i = 0; i < 6; i++) {
+                const y = (i * canvas.height) / 5;
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+            }
+            ctx.stroke();
+        };
+        
+        drawVU();
     }
 
     showInstrumentModal() {
@@ -462,6 +676,11 @@ export class RenderEngine {
             const removeBtn = document.createElement('button');
             removeBtn.className = 'remove-instrument';
             removeBtn.textContent = '✕';
+            removeBtn.onclick = (e) => {
+                e.stopPropagation();
+                this.audioEngine.removeInstrument(id);
+                instrumentContainer.remove();
+            };
 
             const muteBtn = document.createElement('button');
             muteBtn.textContent = 'Mute';

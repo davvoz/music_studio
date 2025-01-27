@@ -158,3 +158,201 @@ body {
 .load-project-btn:hover {
     background: #3498db;
 }
+
+/* Master section base styles */
+.master-section {
+    position: fixed;
+    top: 60px;
+    right: 20px;
+    background: #333;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 15px;
+    z-index: 1000;
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+    will-change: transform;
+}
+
+.master-section:active {
+    cursor: grabbing;
+}
+
+.master-section .master-fader {
+    cursor: pointer;
+}
+
+.master-fader-container {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    margin-right: 20px;
+}
+
+.master-fader-container .midi-learn-btnn {
+    margin-top: 5px;
+    padding: 4px 8px;
+    font-size: 12px;
+    background: #444;
+    border: none;
+    border-radius: 3px;
+    color: #fff;
+    cursor: pointer;
+    width: 100%;
+    height: auto;
+    position: relative;
+    display: block;
+    text-align: center;
+    transform: none;  /* Rimuovi eventuali transform predefiniti */
+}
+
+.master-fader-container .midi-learn-btnn.learning {
+    background: #f44336;
+    animation: none;  /* Rimuovi l'animazione che potrebbe causare problemi */
+}
+
+.master-fader-container .midi-learn-btnn.has-mapping {
+    background: #4CAF50;
+}
+
+.master-fader {
+    height: 200px;
+    writing-mode: bt-lr;
+    -webkit-appearance: slider-vertical;
+    width: 20px;
+    background: #444;
+}
+
+.master-value-display {
+    font-family: 'Share Tech Mono', monospace;
+    color: #fff;
+    background: #222;
+    padding: 3px 6px;
+    border-radius: 3px;
+    min-width: 50px;
+    text-align: center;
+}
+
+.master-vu-meter {
+    margin-left: 10px;
+    background: #262626;
+    border-radius: 3px;
+}
+
+/* Rimuovi le vecchie regole duplicate del midi-learn-btnn e master-section */
+
+/* Stile corretto per il bottone MIDI learn */
+.midi-learn-btnn {
+   z-index: 9999999;
+}
+
+.midi-learn-btnn svg {
+    width: 16px; /* Aumentato */
+    height: 16px;
+    fill: currentColor;
+}
+
+.midi-learn-btnn:hover {
+    background: #555;
+    color: #fff;
+}
+
+.midi-learn-btnn.learning {
+    background: #f44336;
+    color: #fff;
+    box-shadow: 0 0 10px rgba(244, 67, 54, 0.5);
+    animation: pulse 1s infinite;
+}
+
+.midi-learn-btnn.has-mapping {
+    color: #4CAF50;
+    border: 2px solid currentColor;
+}
+
+.midi-context-menu {
+   
+    position: absolute;
+    background: #222;
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 4px 0;
+    min-width: 120px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    z-index: 1000;
+}
+
+.midi-menu-item {
+    padding: 6px 12px;
+    cursor: pointer;
+    color: #fff;
+    transition: background-color 0.2s;
+}
+
+.midi-menu-item:hover {
+    background: #444;
+}
+
+.midi-learn-btnn.context-active {
+    background: #555;
+    color: #fff;
+}
+
+.midi-tooltip {
+    position: absolute;
+    top: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #000;
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease;
+    pointer-events: none;  /* Evita che il tooltip interferisca */
+    z-index: 102;
+    content: "Right Click for MIDI Learn";
+}
+
+.midi-learn-btnn:hover .midi-tooltip {
+    opacity: 1;
+    visibility: visible;
+}
+
+@keyframes pulse {
+    0% { opacity: 0.8; }
+    50% { opacity: 1; }
+    100% { opacity: 0.8; }
+}
+
+
+
+.master-section .midi-learn-btnn:hover {
+    background: #555;
+}
+
+
+.master-section .midi-learn-btnn:hover::before {
+    opacity: 1;
+    visibility: visible;
+}
+
+.master-section .midi-learn-btnn.learning {
+    background: #f44336;
+    animation: pulseFixed 1s infinite;
+}
+
+@keyframes pulseFixed {
+    0% { transform: translateY(-50%) scale(1); }
+    50% { transform: translateY(-50%) scale(1.1); }
+    100% { transform: translateY(-50%) scale(1); }
+}
