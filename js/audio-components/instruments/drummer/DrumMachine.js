@@ -1,5 +1,6 @@
 import { AbstractInstrument } from "../../abstract/AbstractInstrument.js";
 import { DrumMachineRender } from "./DrumMachineRender.js";
+import { MIDIMapping } from "../../../core/MIDIMapping.js";  // Add this import
 
 export class DrumMachine extends AbstractInstrument {
     constructor(context) {
@@ -42,6 +43,9 @@ export class DrumMachine extends AbstractInstrument {
         }
 
         this.selectedLength = 32; // Aggiungi questa linea
+
+        // Inizializza MIDI mapping con supporto al salvataggio
+        this.midiMapping = new MIDIMapping();
     }
 
     setupAudio() {
@@ -293,6 +297,15 @@ export class DrumMachine extends AbstractInstrument {
         } catch (error) {
             console.error('Error saving pattern:', error);
             return false;
+        }
+    }
+
+    // Aggiungi questo metodo per gestire il ripristino delle mappature MIDI
+    restoreMIDIMappings(mappings) {
+        if (this.midiMapping && mappings) {
+            this.midiMapping.setMappings(mappings);
+            // Aggiorna l'UI se necessario
+            this.renderer?.updateMIDIMappings?.(mappings);
         }
     }
 }

@@ -16,7 +16,7 @@ export class AudioEngine {
         this.currentBeat = 0;
         this.totalBeats = 32; // Aggiungi questo
         // Increase scheduler ahead time
-        this.scheduleAheadTime = 0.2; // Aumentato da 0.1 a 0.2
+        this.scheduleAheadTime = 0.1; // Quanto tempo in anticipo schedulare (secondi)
         this.lookAhead = 25.0; // milliseconds
         
         // Internal scheduling
@@ -66,6 +66,109 @@ export class AudioEngine {
 
         // Track mute/solo states
         this.instrumentStates = new Map();
+
+        // Add MIDI learn state
+        this.midiLearnTarget = null;
+        this.midiMappings = new Map(); // { midiNote: { id, control, type } }
+        this.lastMidiId = 0; // Aggiungi contatore per ID univoci
+        
+        // Setup MIDI handling if available
+        if (navigator.requestMIDIAccess) {
+            navigator.requestMIDIAccess()
+                .then(access => this.initializeMIDI(access))
+                .catch(err => console.warn('MIDI not available:', err));
+        }
+
+        // Struttura semplificata per APC40
+        this.APC40 = {
+            CHANNEL: 0,          // APC40 usa il canale 1
+            STATUS_NOTE_ON: 144, // 0x90 - Note On sul canale 1
+            STATUS_NOTE_OFF: 128 // 0x80 - Note Off sul canale 1
+        };
+
+        // Mappa semplice per i controlli MIDI
+        this.midiControls = new Map();
+
+        // Aggiungi tracking dello stato dei pulsanti
+        this.buttonStates = new Map();
+
+        // Solo le mappature MIDI essenziali
+        this.midiMappings = new Map(); // { noteNumber: { id, action } }
+        this.midiLearnTarget = null;
+
+        // Migliora la struttura delle mappature MIDI
+        this.midiMappings = new Map(); // { `${midiNote}-${channel}`: { id, control } }
+        this.midiLearnTarget = null;
+
+        // Semplifica la gestione MIDI
+        this.midiMappings = new Map();  // formato: { `${note}-${channel}-${control}-${id}`: { id, control } }
+
+        // Struttura semplificata per i mapping MIDI
+        this.midiMappings = new Map();
+        this.midiLearnTarget = null;
+
+        // Debug flag
+        this.DEBUG = true;
+
+        // MIDI setup - RIMUOVI TUTTE LE ALTRE DICHIARAZIONI di midiMappings nel costruttore
+        this.midiMappings = new Map();
+        this.midiLearnTarget = null;
+        this.DEBUG = true;
+
+        // Costanti APC40
+        this.APC40 = {
+            MUTE_CHANNEL: 0,
+            SOLO_CHANNEL: 1,
+            NOTE_ON: 144,    // 0x90
+            NOTE_OFF: 128    // 0x80
+        };
+
+        // Configurazione specifica APC40
+        this.midiControlMap = new Map();  // { instrumentId -> { mute: noteNumber, solo: noteNumber } }
+        this.DEBUG = true;
+
+        // Struttura MIDI semplificata per l'APC40
+        this.midiMappings = new Map(); // { note: { id, type } }
+        this.midiLearnTarget = null;
+        this.DEBUG = true;
+
+        // Semplifica al massimo la gestione MIDI
+        this.midiControlMap = new Map();  // { note: { id, type, state: boolean } }
+        this.midiLearnTarget = null;
+
+        // Aggiungi output MIDI per l'APC40
+        this.midiOutput = null;
+        if (navigator.requestMIDIAccess) {
+            navigator.requestMIDIAccess()
+                .then(access => {
+                    this.initializeMIDI(access);
+                    // Prendi il primo output disponibile (APC40)
+                    this.midiOutput = access.outputs.values().next().value;
+                })
+                .catch(err => console.warn('MIDI not available:', err));
+        }
+
+        // Semplifica la struttura MIDI
+        this.midiControlMap = new Map(); // { noteNumber: { id: string, type: 'mute'|'solo' } }
+        this.midiLearnTarget = null;
+        this.DEBUG = true;
+        this.midiOutput = null;
+
+        // Rimuovi tutte le strutture MIDI tranne quelle base
+        this.midiOutput = null;
+        this.midiControlMap = new Map();
+        this.midiLearnTarget = null;
+        this.DEBUG = true;
+
+        // Setup MIDI base
+        if (navigator.requestMIDIAccess) {
+            navigator.requestMIDIAccess()
+                .then(access => {
+                    this.initializeMIDI(access);
+                    this.midiOutput = access.outputs.values().next().value;
+                })
+                .catch(err => console.warn('MIDI not available:', err));
+        }
     }
 
     setupAudioResume() {
@@ -102,6 +205,34 @@ export class AudioEngine {
         }
         this.instrumentStates.delete(id);
         this.updateMuteSoloStates();
+
+        // Rimuovi tutti i mapping MIDI associati a questo strumento
+        for (const [key, mapping] of this.midiMappings.entries()) {
+            if (mapping.id === id) {
+                this.midiMappings.delete(key);
+            }
+        }
+
+        // Rimuovi i controlli MIDI associati
+        for (const [note, control] of this.midiControls.entries()) {
+            if (control.id === id) {
+                this.midiControls.delete(note);
+            }
+        }
+
+        // Rimuovi tutte le mappature MIDI per questo strumento
+        for (const [note, mapping] of this.midiMappings.entries()) {
+            if (mapping.id === id) {
+                this.midiMappings.delete(note);
+            }
+        }
+
+        // Rimuovi tutte le mappature MIDI per questo strumento
+        for (const [key, mapping] of this.midiMappings.entries()) {
+            if (mapping.id === id) {
+                this.midiMappings.delete(key);
+            }
+        }
     }
 
     start() {
@@ -188,8 +319,14 @@ export class AudioEngine {
     scheduleBeat(beat, time) {
         const normalizedBeat = beat % 32; // Ensure we're always using 32 steps
         
+        // Calcola il tempo preciso per questo beat
+        const secondsPerBeat = 60.0 / this.tempo;
+        const preciseTime = time;
+        
         this.instruments.forEach(instrument => {
-            instrument.onBeat?.(normalizedBeat, time);
+            if (instrument.onBeat) {
+                instrument.onBeat(normalizedBeat, preciseTime);
+            }
         });
         
         if (this.onBeatUpdate) {
@@ -258,6 +395,7 @@ export class AudioEngine {
         }
 
         this.updateMuteSoloStates();
+        this.updateInstrumentState(id, shouldMute, this.instrumentStates.get(id)?.soloed || false);
     }
 
     soloInstrument(id, shouldSolo) {
@@ -272,6 +410,7 @@ export class AudioEngine {
         }
 
         this.updateMuteSoloStates();
+        this.updateInstrumentState(id, this.instrumentStates.get(id)?.muted || false, shouldSolo);
     }
 
     updateMuteSoloStates() {
@@ -282,14 +421,15 @@ export class AudioEngine {
             const state = this.instrumentStates.get(id);
             if (!state) return;
 
-            // Aggiorna lo stato dell'instrument
-            instrument._hasSoloedInstruments = hasSoloedInstruments;
-            instrument.setMuted(state.muted);
-            instrument.setSolo(state.soloed);
+            // Calculate effective mute state
+            const shouldBeMuted = state.muted || (hasSoloedInstruments && !state.soloed);
+            
+            // Update instrument audio state
+            instrument.setMuted(shouldBeMuted);
 
-            // Emetti evento per l'UI
+            // Emit state change for UI
             this.emitInstrumentStateChange(id, {
-                muted: state.muted,
+                muted: shouldBeMuted,
                 soloed: state.soloed
             });
         });
@@ -300,5 +440,40 @@ export class AudioEngine {
             detail: { id, state }
         });
         window.dispatchEvent(event);
+    }
+
+    initializeMIDI(access) {
+        access.inputs.forEach(input => {
+            input.onmidimessage = (message) => this.handleMIDIMessage(message);
+        });
+    }
+
+    // Semplifica la gestione MIDI temporaneamente
+    handleMIDIMessage(message) {
+        // Per ora lasciamo vuoto, lo implementeremo dopo
+    }
+
+    // Debug helper
+    printMidiMappings() {
+        console.log('=== MIDI Mappings ===');
+        for (const [note, mapping] of this.midiMappings.entries()) {
+            console.log(`Note ${note}:`, mapping);
+        }
+    }
+    
+    // Debug helper migliorato
+    logMidiMappings() {
+        console.log('=== Current MIDI Mappings ===');
+        for (const [key, mapping] of this.midiMappings.entries()) {
+            const [note, channel, control, id] = key.split('-');
+            console.log({
+                key,
+                note,
+                channel,
+                control,
+                id,
+                mapping
+            });
+        }
     }
 }

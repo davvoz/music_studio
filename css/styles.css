@@ -593,3 +593,56 @@ body {
 }
 
 /* ...existing code... */
+
+.midi-tooltip {
+    position: fixed;
+    background: #333;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    z-index: 1000;
+    pointer-events: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.mute-btn, .solo-btn {
+    cursor: pointer;
+    position: relative;
+}
+
+.mute-btn:hover::after,
+.solo-btn:hover::after {
+    content: attr(data-midi-learn);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+/* ...existing code... */
+
+.midi-learning {
+    animation: pulse 1.5s infinite;
+    background: #f39c12 !important;
+    border: 2px solid #e67e22;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+.midi-tooltip.learning {
+    background: #f39c12;
+    font-weight: bold;
+}
+
+/* ...existing code... */

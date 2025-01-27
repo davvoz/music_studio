@@ -21,26 +21,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.body.appendChild(renderEngine.render());
 
-    // Example: Add a MonoSynth
-    //add a sampler
-    const sampler = new Sampler(audioEngine.context);
-    audioEngine.addInstrument('sampler', sampler);
-    renderEngine.addInstrumentUI('sampler', sampler);   
-
-    // Add TB-303
-    const tb303 = new TB303(audioEngine.context);
-    audioEngine.addInstrument('tb303', tb303);
-    renderEngine.addInstrumentUI('tb303', tb303);
-    
-    // Add Drum Machine
-    const drummer = new DrumMachine(audioEngine.context);
-    audioEngine.addInstrument('drummer', drummer);
-    renderEngine.addInstrumentUI('drummer', drummer);
-    
-    // Add option for Looper in instrument selection
-    const looper = new Looper(audioEngine.context);
-    audioEngine.addInstrument('looper', looper);
-    renderEngine.addInstrumentUI('looper', looper);
+   
     
     // Forward MIDI messages to each instrument
     midiManager.addHandler((message) => {

@@ -1,7 +1,9 @@
 export class MIDIMapping {
     constructor() {
         this.mappings = new Map();
-        this.learningParam = null;
+        this.learningCallback = null;
+        this.currentParameter = null;
+        this.isLearning = false;
     }
 
     startLearning(param) {
@@ -54,5 +56,32 @@ export class MIDIMapping {
                 this.mappings.delete(key);
             }
         }
+    }
+
+    getMappingForParam(param) {
+        for (const [key, value] of this.mappings.entries()) {
+            if (value === param) {
+                const [channel, cc] = key.split('_');
+                return { channel: parseInt(channel), cc: parseInt(cc) };
+            }
+        }
+        return null;
+    }
+
+    // Nuovo metodo per ottenere tutte le mappature
+    getMappings() {
+        const mappingsObject = {};
+        this.mappings.forEach((value, key) => {
+            mappingsObject[key] = value;
+        });
+        return mappingsObject;
+    }
+
+    // Nuovo metodo per impostare le mappature da un oggetto
+    setMappings(mappingsObject) {
+        this.mappings.clear();
+        Object.entries(mappingsObject).forEach(([key, value]) => {
+            this.mappings.set(key, value);
+        });
     }
 }

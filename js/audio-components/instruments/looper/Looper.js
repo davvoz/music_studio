@@ -22,19 +22,30 @@ export class Looper extends AbstractInstrument {
         this.startOffset = 0;
 
         this.sliceLength = 4;
+        this.tempo = 120;
         this.beatDuration = 60 / this.tempo;
+        this.startingStep = 0;
         this.pitch = 1.0;
+        this.lastBeatTime = 0;
+        this.quantizeToGrid = true;
+        this.currentBeat = 0;
+        this.beatsPerSlice = 1;
+        this.nextSliceTime = 0;
     }
 
     async loadFile(file) {
         try {
+            this.renderer.showLoading();
             const arrayBuffer = await file.arrayBuffer();
             this.buffer = await this.context.decodeAudioData(arrayBuffer);
             this.updateSliceDuration();
             this.generateWaveformData();
             this.renderer.updateDisplay(file.name, this.buffer.duration, this.waveformData);
+            this.renderer.hideLoading();
         } catch (error) {
             console.error('Error loading audio file:', error);
+            this.renderer.showError('Failed to load audio file. Please try another file.');
+            this.renderer.hideLoading();
         }
     }
 
@@ -46,6 +57,7 @@ export class Looper extends AbstractInstrument {
 
     setSliceLength(length) {
         this.sliceLength = length;
+        this.beatsPerSlice = length;
         this.updateSliceDuration();
     }
 
@@ -53,28 +65,67 @@ export class Looper extends AbstractInstrument {
         this.pitch = value;
     }
 
+    setStartingStep(step) {
+        this.startingStep = parseInt(step);
+    }
+
     updateSliceDuration() {
         if (this.buffer) {
-            try {
-                // Calcola semplicemente la durata di ogni slice
-                this.sliceDuration = this.buffer.duration / this.divisions;
-            } catch (error) {
-                console.warn('Error calculating slice duration:', error);
-                this.sliceDuration = this.buffer.duration / this.divisions;
-            }
+            const beatsPerMinute = this.tempo;
+            const secondsPerBeat = 60 / beatsPerMinute;
+            this.sliceDuration = secondsPerBeat * this.sliceLength;
         }
     }
 
-    onBeat(beat) {
-        if (!this.buffer) return;
+    onBeat(beat, time) {
+        if (!this.buffer || !this.isPlaying) return;
 
-        // Normalizza il beat in base alla lunghezza della slice
-        const beatInPattern = beat % (this.divisions * this.sliceLength);
-        const slice = Math.floor(beatInPattern / this.sliceLength);
+        const beatInPattern = beat % (this.divisions * this.beatsPerSlice);
+        const currentSlice = Math.floor(beatInPattern / this.beatsPerSlice);
         
-        if (slice !== this.currentSlice) {
-            this.currentSlice = slice;
-            this.playSlice(slice);
+        const effectiveSlice = (currentSlice + parseInt(this.startingStep)) % this.divisions;
+
+        if (effectiveSlice !== this.currentSlice) {
+            this.currentSlice = effectiveSlice;
+            this.playSliceAtTime(this.currentSlice, time);
+            
+            console.log(`Beat: ${beat}, Slice: ${effectiveSlice}, Time: ${time}`);
+        }
+    }
+
+    playSliceAtTime(sliceIndex, time) {
+        if (!this.buffer || !this.isPlaying) return;
+        
+        try {
+            const source = this.context.createBufferSource();
+            source.buffer = this.buffer;
+            source.playbackRate.value = this.pitch;
+            
+            const sliceStart = (sliceIndex * this.buffer.duration) / this.divisions;
+            const sliceDuration = (this.buffer.duration / this.divisions);
+            
+            const gainNode = this.context.createGain();
+            gainNode.connect(this.instrumentOutput);
+            source.connect(gainNode);
+            
+            const fadeDuration = 0.002;
+            gainNode.gain.setValueAtTime(0, time);
+            gainNode.gain.linearRampToValueAtTime(1, time + fadeDuration);
+            gainNode.gain.setValueAtTime(1, time + sliceDuration - fadeDuration);
+            gainNode.gain.linearRampToValueAtTime(0, time + sliceDuration);
+            
+            source.start(time, sliceStart, sliceDuration);
+            
+            requestAnimationFrame(() => {
+                this.renderer?.updateCurrentSlice(sliceIndex);
+            });
+            
+            source.onended = () => {
+                source.disconnect();
+                gainNode.disconnect();
+            };
+        } catch (error) {
+            console.error('Error playing slice:', error);
         }
     }
 
@@ -82,7 +133,6 @@ export class Looper extends AbstractInstrument {
         if (!this.buffer || !this.isPlaying) return;
         
         try {
-            // Cleanup precedente source
             if (this.source) {
                 this.source.stop();
                 this.source.disconnect();
@@ -91,12 +141,23 @@ export class Looper extends AbstractInstrument {
             this.source = this.context.createBufferSource();
             this.source.buffer = this.buffer;
             this.source.playbackRate.value = this.pitch;
-            this.source.connect(this.instrumentOutput); // <-- Questa riga mancava!
-
-            const startTime = sliceIndex * this.sliceDuration;
-            const safeDuration = Math.min(this.sliceDuration, this.buffer.duration - startTime);
             
-            this.source.start(this.context.currentTime, startTime, safeDuration);
+            const gainNode = this.context.createGain();
+            gainNode.connect(this.instrumentOutput);
+            this.source.connect(gainNode);
+            
+            const startTime = this.context.currentTime;
+            const fadeTime = 0.005;
+            
+            gainNode.gain.setValueAtTime(0, startTime);
+            gainNode.gain.linearRampToValueAtTime(1, startTime + fadeTime);
+            gainNode.gain.setValueAtTime(1, startTime + this.sliceDuration - fadeTime);
+            gainNode.gain.linearRampToValueAtTime(0, startTime + this.sliceDuration);
+
+            const sliceStart = sliceIndex * this.sliceDuration;
+            const safeDuration = Math.min(this.sliceDuration, this.buffer.duration - sliceStart);
+            
+            this.source.start(startTime, sliceStart, safeDuration);
             this.currentSlice = sliceIndex;
             this.renderer.updateCurrentSlice(sliceIndex);
         } catch (error) {
@@ -108,7 +169,6 @@ export class Looper extends AbstractInstrument {
         if (!this.buffer) return;
         this.isPlaying = true;
 
-        // Ferma e disconnette eventuali source precedenti
         if (this.source) {
             try {
                 this.source.stop();
@@ -118,7 +178,6 @@ export class Looper extends AbstractInstrument {
             }
         }
 
-        // Crea una nuova sorgente e riproduce l'intero buffer
         this.source = this.context.createBufferSource();
         this.source.buffer = this.buffer;
         this.source.playbackRate.value = this.pitch;
@@ -154,7 +213,6 @@ export class Looper extends AbstractInstrument {
         this.isPlaying = false;
         if (this.source) {
             try {
-                // Controlla se il source è attivo prima di fermarlo
                 if (this.source.playbackState === 'playing') {
                     this.source.stop();
                 }
@@ -172,7 +230,5 @@ export class Looper extends AbstractInstrument {
     }
 
     onTransportStop() {
-        // Rimuovi la chiamata a this.stop() se vuoi lasciar suonare il campione
-        // this.stop();
     }
 }

@@ -695,4 +695,11 @@ export class TB303 extends AbstractInstrument {
                 break;
         }
     }
+
+    // Aggiungi questo metodo per gestire il ripristino delle mappature MIDI
+    restoreMIDIMappings(mappings) {
+        if (this.midiMapping && mappings) {
+            this.midiMapping.setMappings(mappings);
+        }
+    }
 }

@@ -102,7 +102,6 @@ export class TB303Render extends AbstractHTMLRender {
                     <div class="pattern-actions">
                         <button class="save-btn">SAVE</button>
                     </div>
-                    <span>PATTERN</span>
                 </div>
             </div>
             <div class="tb303-sequence"></div>

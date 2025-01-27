@@ -1,6 +1,7 @@
 import { TB303 } from '../audio-components/instruments/tb303/TB303.js';
 import { DrumMachine } from '../audio-components/instruments/drummer/DrumMachine.js';
 import { Sampler } from '../audio-components/instruments/sampler/Sampler.js';  // Aggiungi questa riga
+import { Looper } from '../audio-components/instruments/looper/Looper.js';  // Aggiungi questa riga
 
 export class RenderEngine {
     constructor(audioEngine) {
@@ -10,43 +11,31 @@ export class RenderEngine {
         this.beatIndicators = [];
         this.currentBeatDisplay = null;
         this.transportState = null;
+        
+        // Basic setup
         this.setupTransportSection();
         this.setupInstrumentRack();
         this.setupMixerSection();
 
-        // Setup audio engine beat callback
-        this.audioEngine.onBeatUpdate = (beat) => {
-            // Ensure we're using a 32-step pattern
-            const normalizedBeat = beat % 32;  // Add this line
-            this.updateTransportDisplay(normalizedBeat);
-        };
-
-        // Add performance optimizations
+        // Performance settings
         this.frameRequest = null;
         this.lastRenderTime = 0;
-        this.renderInterval = 1000 / 30; // 30 FPS max for UI updates
-
-        // Optimize UI updates
+        this.renderInterval = 1000 / 30;
         this.pendingUIUpdate = false;
         this.lastUIUpdateTime = 0;
-        this.minUIUpdateInterval = 33; // ~30fps
-
-        // Add debounce utility
+        this.minUIUpdateInterval = 33;
         this.debounceTimeout = null;
         this.isAnimating = false;
-
-        // Aggiungi performance optimizations
-        this.frameRequest = null;
-        this.lastBeatUpdate = 0;
-        this.minUpdateInterval = 16; // ~60fps
-        this.pendingUpdates = new Map();
-        this.isUpdating = false;
-
-        // Add new properties
         this.instrumentCache = new Map();
         this.uiUpdateQueue = new Set();
         this.lastUIUpdate = 0;
-        this.updateInterval = 1000 / 60; // 60fps target
+        this.updateInterval = 1000 / 60;
+
+        // Setup audio engine beat callback
+        this.audioEngine.onBeatUpdate = (beat) => {
+            const normalizedBeat = beat % 32;
+            this.updateTransportDisplay(normalizedBeat);
+        };
     }
 
     setupTransportSection() {
@@ -91,6 +80,22 @@ export class RenderEngine {
         addButton.className = 'add-instrument-btn';
         addButton.textContent = '+ Add Instrument';
         addButton.onclick = () => this.showInstrumentModal();
+
+        // Aggiungi i pulsanti per il progetto dopo il pulsante Add Instrument
+        const projectControls = document.createElement('div');
+        projectControls.className = 'project-controls';
+        
+        const saveProjectBtn = document.createElement('button');
+        saveProjectBtn.className = 'save-project-btn';
+        saveProjectBtn.textContent = 'Save Project';
+        saveProjectBtn.onclick = () => this.saveProject();
+
+        const loadProjectBtn = document.createElement('button');
+        loadProjectBtn.className = 'load-project-btn';
+        loadProjectBtn.textContent = 'Load Project';
+        loadProjectBtn.onclick = () => this.loadProject();
+
+        projectControls.append(saveProjectBtn, loadProjectBtn);
 
         // Tempo section
         const tempoSection = document.createElement('div');
@@ -140,6 +145,7 @@ export class RenderEngine {
             stopButton, 
             //metronomeButton,
             addButton,  // Add the button here
+            projectControls,  // Aggiungi i controlli del progetto
             tempoSection,
             //beatDisplay,
             //this.currentBeatDisplay
@@ -151,6 +157,153 @@ export class RenderEngine {
         this.audioEngine.onBeatUpdate = (beat) => {
             this.updateBeatIndicators(beat);
         };
+    }
+
+    saveProject() {
+        const project = {
+            tempo: this.audioEngine.tempo,
+            instruments: []
+        };
+
+        this.audioEngine.instruments.forEach((instrument, id) => {
+            const type = instrument.constructor.name;
+            const config = {
+                id,
+                type,
+                parameters: instrument.parameters,
+                sequence: instrument.sequence,
+                // Aggiungi le mappature MIDI se l'instrument le supporta
+                midiMappings: instrument.midiMapping?.getMappings() || {}
+            };
+            project.instruments.push(config);
+        });
+
+        try {
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const projectKey = `music_studio_project_${timestamp}`;
+            localStorage.setItem(projectKey, JSON.stringify(project));
+
+            // Salva la lista dei progetti
+            const projectsList = JSON.parse(localStorage.getItem('music_studio_projects') || '[]');
+            projectsList.push({
+                key: projectKey,
+                name: `Project ${timestamp}`,
+                date: timestamp
+            });
+            localStorage.setItem('music_studio_projects', JSON.stringify(projectsList));
+
+            alert('Project saved successfully!');
+        } catch (error) {
+            console.error('Error saving project:', error);
+            alert('Error saving project!');
+        }
+    }
+
+    loadProject() {
+        const projectsList = JSON.parse(localStorage.getItem('music_studio_projects') || '[]');
+        if (projectsList.length === 0) {
+            alert('No saved projects found!');
+            return;
+        }
+
+        const modal = document.createElement('div');
+        modal.className = 'project-modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h2>Load Project</h2>
+                <div class="projects-list">
+                    ${projectsList.map(proj => `
+                        <div class="project-item" data-key="${proj.key}">
+                            <span>${proj.name}</span>
+                            <span class="project-date">${new Date(proj.date).toLocaleString()}</span>
+                            <button class="delete-project">✕</button>
+                        </div>
+                    `).join('')}
+                </div>
+                <button class="modal-close">Close</button>
+            </div>
+        `;
+
+        modal.querySelector('.modal-close').onclick = () => modal.remove();
+
+        modal.addEventListener('click', async (e) => {
+            const projectItem = e.target.closest('.project-item');
+            const deleteBtn = e.target.closest('.delete-project');
+
+            if (deleteBtn) {
+                e.stopPropagation();
+                const key = projectItem.dataset.key;
+                if (confirm('Delete this project?')) {
+                    localStorage.removeItem(key);
+                    const updatedList = projectsList.filter(p => p.key !== key);
+                    localStorage.setItem('music_studio_projects', JSON.stringify(updatedList));
+                    projectItem.remove();
+                }
+                return;
+            }
+
+            if (projectItem) {
+                const key = projectItem.dataset.key;
+                const projectData = JSON.parse(localStorage.getItem(key));
+                await this.loadProjectData(projectData);
+                modal.remove();
+            }
+        });
+
+        document.body.appendChild(modal);
+    }
+
+    async loadProjectData(project) {
+        // Stop playback and clear current instruments
+        this.audioEngine.stop();
+        Array.from(this.audioEngine.instruments.keys()).forEach(id => {
+            this.audioEngine.removeInstrument(id);
+            const element = this.instrumentRack.querySelector(`[data-instance-id="${id}"]`);
+            element?.remove();
+        });
+
+        // Set tempo
+        this.audioEngine.setTempo(project.tempo);
+
+        // Load instruments
+        for (const inst of project.instruments) {
+            try {
+                const InstrumentClass = this.getInstrumentClass(inst.type);
+                if (InstrumentClass) {
+                    const instrument = new InstrumentClass(this.audioEngine.context);
+                    
+                    // Restore parameters and sequence
+                    Object.assign(instrument.parameters, inst.parameters);
+                    if (inst.sequence) {
+                        instrument.sequence = inst.sequence;
+                    }
+
+                    // Restore MIDI mappings if available
+                    if (inst.midiMappings && instrument.midiMapping) {
+                        instrument.midiMapping.setMappings(inst.midiMappings);
+                    }
+
+                    // Add instrument to engine
+                    this.audioEngine.addInstrument(inst.id, instrument);
+                    this.addInstrumentUI(inst.id, instrument);
+
+                    // Allow time for instrument initialization
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+            } catch (error) {
+                console.error(`Error loading instrument ${inst.type}:`, error);
+            }
+        }
+    }
+
+    getInstrumentClass(type) {
+        switch (type) {
+            case 'TB303': return TB303;
+            case 'DrumMachine': return DrumMachine;
+            case 'Sampler': return Sampler;
+            case 'Looper': return Looper;
+            default: return null;
+        }
     }
 
     updateBeatIndicators(currentBeat) {
@@ -247,7 +400,8 @@ export class RenderEngine {
         const instruments = [
             { id: 'tb303', name: 'TB-303', class: TB303 },
             { id: 'drummer', name: 'Drum Machine', class: DrumMachine },
-            { id: 'sampler', name: 'Sampler', class: Sampler }  // Aggiungi questa riga
+            { id: 'sampler', name: 'Sampler', class: Sampler }  ,// Aggiungi questa riga
+            { id: 'looper', name: 'Looper', class: Looper }  // Aggiungi questa riga
         ];
         
         const list = document.createElement('div');
@@ -292,70 +446,35 @@ export class RenderEngine {
             const instrumentContainer = document.createElement('div');
             instrumentContainer.className = 'instrument-container';
             instrumentContainer.dataset.type = instrumentComponent.constructor.name.toLowerCase();
+            instrumentContainer.dataset.instanceId = id;  // Aggiungi l'ID dell'istanza
 
-            // Create header
+            // Create header with basic controls
             const header = document.createElement('div');
             header.className = 'instrument-header';
 
-            // Add title
             const title = document.createElement('h3');
             title.textContent = instrumentComponent.constructor.name;
             
-            // Add collapse button with optimized animation
             const collapseBtn = document.createElement('button');
             collapseBtn.className = 'collapse-btn';
             collapseBtn.innerHTML = '▼';
-            
-            // Optimize collapse animation
-            const handleCollapse = (e) => {
-                if (this.isAnimating) return;
-                e.stopPropagation();
-                
-                this.isAnimating = true;
-                const panel = instrumentContainer.querySelector('.instrument-panel');
-                
-                // Use CSS transform instead of height animation
-                requestAnimationFrame(() => {
-                    instrumentContainer.classList.toggle('collapsed');
-                    collapseBtn.style.transform = 
-                        instrumentContainer.classList.contains('collapsed') 
-                            ? 'rotate(0deg)' 
-                            : 'rotate(180deg)';
-                    
-                    // Save state after animation is complete
-                    clearTimeout(this.debounceTimeout);
-                    this.debounceTimeout = setTimeout(() => {
-                        const type = instrumentContainer.dataset.type;
-                        localStorage.setItem(`${type}-${id}-collapsed`, 
-                            instrumentContainer.classList.contains('collapsed'));
-                        this.isAnimating = false;
-                    }, 200);
-                });
-            };
 
-            collapseBtn.onclick = handleCollapse;
-            header.onclick = (e) => {
-                if (!this.isAnimating) handleCollapse(e);
-            };
-
-            // Add remove button
             const removeBtn = document.createElement('button');
             removeBtn.className = 'remove-instrument';
             removeBtn.textContent = '✕';
-            removeBtn.onclick = (e) => {
-                e.stopPropagation();
-                this.audioEngine.removeInstrument(id);
-                instrumentContainer.remove();
-            };
 
-            // Add mute button
             const muteBtn = document.createElement('button');
             muteBtn.textContent = 'Mute';
             muteBtn.className = 'mute-btn';
+
+            const soloBtn = document.createElement('button');
+            soloBtn.textContent = 'Solo';
+            soloBtn.className = 'solo-btn';
+
+            // Add click handlers
             muteBtn.onclick = (e) => {
                 e.stopPropagation();
                 const shouldMute = !muteBtn.classList.contains('active');
-                // Se stiamo unmutando uno strumento in solo, disattiva il solo
                 if (!shouldMute && soloBtn.classList.contains('active')) {
                     soloBtn.classList.remove('active');
                     this.audioEngine.soloInstrument(id, false);
@@ -363,23 +482,16 @@ export class RenderEngine {
                 this.audioEngine.muteInstrument(id, shouldMute);
             };
 
-            // Add solo button
-            const soloBtn = document.createElement('button');
-            soloBtn.textContent = 'Solo';
-            soloBtn.className = 'solo-btn';
             soloBtn.onclick = (e) => {
                 e.stopPropagation();
                 const shouldSolo = !soloBtn.classList.contains('active');
-                
                 if (shouldSolo) {
-                    // Se stiamo attivando il solo, disattiva il mute
                     muteBtn.classList.remove('active');
                 }
-                
                 this.audioEngine.soloInstrument(id, shouldSolo);
             };
 
-            // Listen for state changes with cleanup
+            // Listen for state changes
             const stateChangeHandler = (e) => {
                 if (e.detail.id === id) {
                     const { muted, soloed } = e.detail.state;
@@ -392,54 +504,41 @@ export class RenderEngine {
 
             window.addEventListener('instrumentStateChange', stateChangeHandler);
             
-            // Cleanup event listener when instrument is removed
+            // Cleanup on remove
             instrumentContainer.addEventListener('remove', () => {
                 window.removeEventListener('instrumentStateChange', stateChangeHandler);
             });
 
-            // Set data attribute for targeting
-            instrumentContainer.dataset.instrumentId = id;
+            // Aggiungi l'event listener per il collapse
+            header.addEventListener('click', (e) => {
+                // Ignora i click sui pulsanti
+                if (e.target.tagName === 'BUTTON') return;
+                
+                const type = instrumentContainer.dataset.type;
+                const isCollapsed = instrumentContainer.classList.toggle('collapsed');
+                localStorage.setItem(`${type}-${id}-collapsed`, isCollapsed);
+                collapseBtn.style.transform = `rotate(${isCollapsed ? '0' : '180'}deg)`;
+            });
 
             // Assemble header
-            header.appendChild(title);
-            header.appendChild(collapseBtn);
-            header.appendChild(removeBtn);
-            header.appendChild(muteBtn);
-            header.appendChild(soloBtn);
+            header.append(title, collapseBtn, removeBtn, muteBtn, soloBtn);
 
-            // Make entire header clickable for collapse
-            header.onclick = () => collapseBtn.click();
-
-            // Instrument panel
+            // Add instrument panel
             const instrumentPanel = document.createElement('div');
             instrumentPanel.className = 'instrument-panel';
             instrumentPanel.appendChild(instrumentComponent.render());
 
-            // Assemble the layout
+            // Assemble container
             instrumentContainer.append(header, instrumentPanel);
             this.instrumentRack.appendChild(instrumentContainer);
 
-            // Restore collapsed state from localStorage
+            // Restore collapse state from localStorage
             const type = instrumentContainer.dataset.type;
             const isCollapsed = localStorage.getItem(`${type}-${id}-collapsed`) === 'true';
             if (isCollapsed) {
                 instrumentContainer.classList.add('collapsed');
                 collapseBtn.style.transform = 'rotate(0deg)';
             }
-
-            // Optimize event delegation
-            instrumentContainer.addEventListener('click', (e) => {
-                const target = e.target;
-                if (target.classList.contains('collapse-btn')) {
-                    this.handleCollapse(instrumentContainer);
-                } else if (target.classList.contains('remove-instrument')) {
-                    this.handleRemove(id, instrumentContainer);
-                } else if (target.classList.contains('mute-btn')) {
-                    this.handleMute(id, target);
-                } else if (target.classList.contains('solo-btn')) {
-                    this.handleSolo(id, target);
-                }
-            }, { passive: true });
         });
     }
 

@@ -52,7 +52,6 @@ export class DrumMachineRender extends AbstractHTMLRender {
                     <div class="pattern-actionse">
                         <button class="save-btn">SAVE</button>
                     </div>
-                    <span>PATTERN</span>
                 </div>
             </div>
             <div class="drum-grid"></div>

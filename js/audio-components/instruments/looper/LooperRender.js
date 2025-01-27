@@ -18,35 +18,61 @@ export class LooperRender extends AbstractHTMLRender {
         this.container.innerHTML = `
             <div class="looper-clip">
                 <div class="clip-header">
-                    <div class="clip-title">No clip loaded</div>
+                    <div class="clip-info">
+                        <div class="clip-title">No clip loaded</div>
+                        <div class="clip-status"></div>
+                    </div>
                     <div class="transport-controls">
-                        <button class="load-btn">Load</button>
-                        <button class="play-btn">Play</button>
-                        <select class="divisions-select">
-                            <option value="32">32 Slices</option>
-                            <option value="16">16 Slices</option>
-                            <option value="8">8 Slices</option>
-                            <option value="4">4 Slices</option>
-                            <option value="2">2 Slices</option>
-                            <option value="1">1 Slice</option>
-                        </select>
-                        <select class="slice-length-select">
-                            <option value="1">1 Beat</option>
-                            <option value="2">2 Beats</option>
-                            <option value="4" selected>4 Beats</option>
-                            <option value="8">8 Beats</option>
-                            <option value="16">16 Beats</option>
-                        </select>
-                        <input type="range" class="pitch-control" 
-                               min="0.25" max="4" step="0.01" value="1"
-                               title="Pitch">
-                        <span class="pitch-value">1.00x</span>
+                        <button class="load-btn" title="Load audio file">Load</button>
+                        <button class="play-btn" title="Play/Stop (Spacebar)">Play</button>
+                        <div class="division-control">
+                            <label>Slices:</label>
+                            <select class="divisions-select" title="Number of slices">
+                                <option value="32">32</option>
+                                <option value="16">16</option>
+                                <option value="8">8</option>
+                                <option value="4">4</option>
+                                <option value="2">2</option>
+                                <option value="1">1</option>
+                            </select>
+                        </div>
+                        <div class="length-control">
+                            <label>Length:</label>
+                            <select class="slice-length-select" title="Slice length in beats">
+                                <option value="1">1 Beat</option>
+                                <option value="2">2 Beats</option>
+                                <option value="4" selected>4 Beats</option>
+                                <option value="8">8 Beats</option>
+                                <option value="16">16 Beats</option>
+                            </select>
+                        </div>
+                        <div class="pitch-control-wrapper">
+                            <label>Pitch:</label>
+                            <input type="range" class="pitch-control" 
+                                   min="0.25" max="4" step="0.01" value="1"
+                                   title="Pitch control (Shift + Mouse Wheel)">
+                            <span class="pitch-value">1.00x</span>
+                        </div>
+                        <div class="start-step-control">
+                            <label>Start Step:</label>
+                            <select class="start-step-select" title="Starting step">
+                                <option value="0">0</option>
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
                 <div class="waveform-view">
+                    <div class="loading-overlay">Loading...</div>
                     <canvas></canvas>
+                    <div class="slice-preview"></div>
                     <div class="grid"></div>
                     <div class="slice-markers"></div>
+                </div>
+                <div class="keyboard-shortcuts">
+                    <button class="show-shortcuts" title="Show keyboard shortcuts">⌨️</button>
                 </div>
             </div>
         `;
@@ -81,6 +107,9 @@ export class LooperRender extends AbstractHTMLRender {
             pitchValue.textContent = `${value.toFixed(2)}x`;
             this.looper.setPitch(value);
         });
+
+        this.setupKeyboardShortcuts();
+        this.setupSlicePreview();
     }
 
     setupCanvas() {
@@ -89,6 +118,8 @@ export class LooperRender extends AbstractHTMLRender {
             const rect = container.getBoundingClientRect();
             this.canvas.width = rect.width;
             this.canvas.height = rect.height;
+            this.canvas.style.width = '100%';  // Forza la larghezza al 100%
+            this.canvas.style.height = '100%'; // Forza l'altezza al 100%
             
             if (this.looper.waveformData) {
                 this.drawWaveform();
@@ -273,6 +304,11 @@ export class LooperRender extends AbstractHTMLRender {
                 this.paramChangeCallback?.('isLooping', isLooping);
             };
         }
+
+        const startStepSelect = this.container.querySelector('.start-step-select');
+        startStepSelect.addEventListener('change', (e) => {
+            this.looper.setStartingStep(e.target.value);
+        });
     }
 
     updateGrid(divisions) {
@@ -341,6 +377,91 @@ export class LooperRender extends AbstractHTMLRender {
             markers.forEach((marker, i) => {
                 marker.classList.toggle('active', i === sliceIndex);
             });
+        }
+    }
+
+    setupKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT') return;
+            
+            if (e.code === 'Space') {
+                e.preventDefault();
+                this.container.querySelector('.play-btn').click();
+            }
+        });
+        
+        // Pitch control with Shift + Mouse Wheel
+        this.container.querySelector('.waveform-view').addEventListener('wheel', (e) => {
+            if (e.shiftKey) {
+                e.preventDefault();
+                const pitchControl = this.container.querySelector('.pitch-control');
+                const step = e.deltaY > 0 ? -0.01 : 0.01;
+                pitchControl.value = parseFloat(pitchControl.value) + step;
+                pitchControl.dispatchEvent(new Event('input'));
+            }
+        });
+    }
+
+    setupSlicePreview() {
+        const slicePreview = this.container.querySelector('.slice-preview');
+        const waveformView = this.container.querySelector('.waveform-view');
+        
+        waveformView.addEventListener('mousemove', (e) => {
+            if (!this.looper.buffer) return;
+            
+            const rect = waveformView.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const sliceIndex = Math.floor((x / rect.width) * this.looper.divisions);
+            
+            if (sliceIndex >= 0 && sliceIndex < this.looper.divisions) {
+                slicePreview.style.display = 'block';
+                slicePreview.style.left = `${(sliceIndex / this.looper.divisions) * 100}%`;
+                slicePreview.style.width = `${100 / this.looper.divisions}%`;
+                slicePreview.textContent = `Slice ${sliceIndex + 1}`;
+            }
+        });
+        
+        waveformView.addEventListener('mouseleave', () => {
+            slicePreview.style.display = 'none';
+        });
+        
+        waveformView.addEventListener('click', (e) => {
+            if (!this.looper.buffer) return;
+            
+            const rect = waveformView.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const sliceIndex = Math.floor((x / rect.width) * this.looper.divisions);
+            
+            if (sliceIndex >= 0 && sliceIndex < this.looper.divisions) {
+                this.looper.playSlice(sliceIndex);
+            }
+        });
+    }
+
+    showLoading() {
+        const loadingOverlay = this.container.querySelector('.loading-overlay');
+        if (loadingOverlay) {
+            loadingOverlay.classList.add('active');
+        }
+    }
+
+    hideLoading() {
+        const loadingOverlay = this.container.querySelector('.loading-overlay');
+        if (loadingOverlay) {
+            loadingOverlay.classList.remove('active');
+        }
+    }
+
+    showError(message) {
+        const statusElement = this.container.querySelector('.clip-status');
+        if (statusElement) {
+            statusElement.textContent = message;
+            statusElement.classList.add('error');
+            // Auto-hide the error after 5 seconds
+            setTimeout(() => {
+                statusElement.textContent = '';
+                statusElement.classList.remove('error');
+            }, 5000);
         }
     }
 }

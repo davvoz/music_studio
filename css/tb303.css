@@ -513,7 +513,6 @@
     padding: 5px;
     background: rgba(0,0,0,0.2);
     border-radius: 4px;
-    margin-top: 20px;
     flex: 1;          /* Aggiunto */
     min-width: 400px; /* Aggiunto */
 }
@@ -567,11 +566,13 @@
 }
 
 .pattern-buttonsi {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 4px;
-    margin-bottom: 4px;
-    position: static;  /* Cambiato da relative */
+    display: flex
+    ;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 4px;
+        margin-bottom: 4px;
+        position: static;
+        flex-direction: column;
 }
 
 .pattern-btn {

@@ -1,0 +1,69 @@
+.transport-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.control-container {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.control-container .midi-learn-btn {
+    position: relative;
+    transform: scale(0.8);
+    opacity: 0;
+    transition: all 0.2s ease;
+}
+
+.control-container:hover .midi-learn-btn {
+    opacity: 1;
+}
+
+.mute-btn,
+.solo-btn {
+    background: #1E2328;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: 4px;
+    color: #808080;
+    padding: 4px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.mute-btn.active,
+.solo-btn.active {
+    background: #FF9500;
+    color: #1E2328;
+    box-shadow: 0 0 10px rgba(255, 149, 0, 0.2);
+}
+
+.midi-learn-btn {
+    width: 30px;
+    height: 20px;
+    background: #1E2328;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: 4px;
+    color: #808080;
+    font-size: 9px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.midi-learn-btn.learning {
+    background: #FF9500;
+    color: #1E2328;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
