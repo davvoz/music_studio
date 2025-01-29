@@ -36,7 +36,7 @@ export class Looper extends AbstractInstrument {
         this.sounds = new Map(); // Map di {name: string, buffer: AudioBuffer, config: Object}
         this.currentSoundName = null;
 
-        this.sliceSettings = []; // Array di oggetti {muted: boolean}
+        this.sliceSettings = []; // Array di oggetti {muted: boolean, reversed: boolean}
         this.initializeSliceSettings();
 
         this.clipboardSlice = null; // Per memorizzare la slice copiata
@@ -44,7 +44,8 @@ export class Looper extends AbstractInstrument {
 
     initializeSliceSettings() {
         this.sliceSettings = Array(this.divisions).fill().map(() => ({
-            muted: false
+            muted: false,
+            reversed: false  // Riaggiungiamo questa proprietà
         }));
     }
 
@@ -201,6 +202,12 @@ export class Looper extends AbstractInstrument {
         }
     }
 
+    toggleSliceReverse(sliceIndex) {
+        if (sliceIndex >= 0 && sliceIndex < this.sliceSettings.length) {
+            this.sliceSettings[sliceIndex].reversed = !this.sliceSettings[sliceIndex].reversed;
+        }
+    }
+
     playSliceAtTime(sliceIndex, time) {
         if (!this.buffer || !this.isPlaying || this.sliceSettings[sliceIndex].muted) return;
         
@@ -208,9 +215,8 @@ export class Looper extends AbstractInstrument {
             const source = this.context.createBufferSource();
             source.buffer = this.buffer;
             const sliceStart = (sliceIndex * this.buffer.duration) / this.divisions;
-            const sliceDuration = (this.buffer.duration / this.divisions);
-            
-            source.playbackRate.value = this.pitch;
+            const sliceDuration = this.buffer.duration / this.divisions;
+            const sliceEnd = sliceStart + sliceDuration;
             
             const gainNode = this.context.createGain();
             gainNode.connect(this.instrumentOutput);
@@ -220,8 +226,18 @@ export class Looper extends AbstractInstrument {
             gainNode.gain.linearRampToValueAtTime(1, time + 0.002);
             gainNode.gain.setValueAtTime(1, time + sliceDuration - 0.002);
             gainNode.gain.linearRampToValueAtTime(0, time + sliceDuration);
+
+            if (this.sliceSettings[sliceIndex].reversed) {
+                source.playbackRate.value = -this.pitch;
+                // Per la riproduzione inversa, iniziamo dalla fine della slice
+                source.start(time, sliceEnd);
+            } else {
+                source.playbackRate.value = this.pitch;
+                source.start(time, sliceStart, sliceDuration);
+            }
             
-            source.start(time, sliceStart, sliceDuration);
+            // Assicuriamoci che la slice si fermi al momento giusto
+            source.stop(time + sliceDuration);
             
             requestAnimationFrame(() => {
                 this.renderer?.updateCurrentSlice(sliceIndex);
@@ -249,10 +265,8 @@ export class Looper extends AbstractInstrument {
             this.source.buffer = this.buffer;
             
             const sliceStart = (sliceIndex * this.buffer.duration) / this.divisions;
-            const sliceDuration = (this.buffer.duration / this.divisions);
-            
-            // Imposta il pitch
-            this.source.playbackRate.value = this.pitch;
+            const sliceDuration = this.buffer.duration / this.divisions;
+            const sliceEnd = sliceStart + sliceDuration;
             
             const gainNode = this.context.createGain();
             gainNode.connect(this.instrumentOutput);
@@ -266,11 +280,19 @@ export class Looper extends AbstractInstrument {
             gainNode.gain.setValueAtTime(1, startTime + sliceDuration - fadeTime);
             gainNode.gain.linearRampToValueAtTime(0, startTime + sliceDuration);
 
-            this.source.start(startTime, sliceStart, sliceDuration);
+            if (this.sliceSettings[sliceIndex].reversed) {
+                this.source.playbackRate.value = -this.pitch;
+                // Per la riproduzione inversa, iniziamo dalla fine della slice
+                this.source.start(startTime, sliceEnd);
+                this.source.stop(startTime + sliceDuration);
+            } else {
+                this.source.playbackRate.value = this.pitch;
+                this.source.start(startTime, sliceStart, sliceDuration);
+            }
             
             this.currentSlice = sliceIndex;
             this.renderer.updateCurrentSlice(sliceIndex);
-
+            
             this.source.onended = () => {
                 this.source.disconnect();
                 gainNode.disconnect();

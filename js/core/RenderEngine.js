@@ -2,6 +2,7 @@ import { TB303 } from '../audio-components/instruments/tb303/TB303.js';
 import { DrumMachine } from '../audio-components/instruments/drummer/DrumMachine.js';
 import { Sampler } from '../audio-components/instruments/sampler/Sampler.js';  // Aggiungi questa riga
 import { Looper } from '../audio-components/instruments/looper/Looper.js';  // Aggiungi questa riga
+import { AIComposer } from '../audio-components/instruments/ai-composer/AIComposer.js';
 
 export class RenderEngine {
     constructor(audioEngine) {
@@ -306,6 +307,7 @@ export class RenderEngine {
             case 'DrumMachine': return DrumMachine;
             case 'Sampler': return Sampler;
             case 'Looper': return Looper;
+            case 'AIComposer': return AIComposer;
             default: return null;
         }
     }
@@ -615,7 +617,8 @@ export class RenderEngine {
             { id: 'tb303', name: 'TB-303', class: TB303 },
             { id: 'drummer', name: 'Drum Machine', class: DrumMachine },
             { id: 'sampler', name: 'Sampler', class: Sampler }  ,// Aggiungi questa riga
-            { id: 'looper', name: 'Looper', class: Looper }  // Aggiungi questa riga
+            { id: 'looper', name: 'Looper', class: Looper }  ,
+            { id: 'ai-composer', name: 'AI Composer', class: AIComposer }
         ];
         
         const list = document.createElement('div');

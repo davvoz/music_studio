@@ -219,6 +219,7 @@ export class LooperRender extends AbstractHTMLRender {
         // Disegna ogni slice separatamente
         for (let i = 0; i < this.looper.divisions; i++) {
             const isMuted = this.looper.sliceSettings[i]?.muted;
+            const isReversed = this.looper.sliceSettings[i]?.reversed;
             const startX = i * sliceWidth;
             const samplesPerSlice = Math.floor(data.length / this.looper.divisions);
             const sliceStart = i * samplesPerSlice;
@@ -230,24 +231,35 @@ export class LooperRender extends AbstractHTMLRender {
             const middle = height / 2;
             const step = sliceWidth / samplesPerSlice;
 
-            // Disegna la forma d'onda superiore
+            // Raccogli i punti per questa slice
+            let points = [];
             for (let j = 0; j < samplesPerSlice; j++) {
                 const value = data[sliceStart + j];
-                const x = startX + (j * step);
-                const y = middle - (value * height/2);
-                if (j === 0) {
-                    this.ctx.moveTo(x, y);
-                } else {
-                    this.ctx.lineTo(x, y);
-                }
+                points.push({
+                    x: startX + (j * step),
+                    y: middle - (value * height/2),
+                    mirror: middle + (value * height/2)
+                });
             }
 
-            // Disegna la forma d'onda inferiore (specchio)
-            for (let j = samplesPerSlice - 1; j >= 0; j--) {
-                const value = data[sliceStart + j];
-                const x = startX + (j * step);
-                const y = middle + (value * height/2);
-                this.ctx.lineTo(x, y);
+            // Se la slice è invertita, inverti i punti
+            if (isReversed) {
+                points.reverse();
+                // Aggiusta le coordinate x dopo l'inversione
+                points.forEach((point, j) => {
+                    point.x = startX + (j * step);
+                });
+            }
+
+            // Disegna la forma d'onda
+            this.ctx.moveTo(points[0].x, points[0].y);
+            // Disegna la parte superiore
+            points.forEach(point => {
+                this.ctx.lineTo(point.x, point.y);
+            });
+            // Disegna la parte inferiore (specchio)
+            for (let j = points.length - 1; j >= 0; j--) {
+                this.ctx.lineTo(points[j].x, points[j].mirror);
             }
 
             this.ctx.closePath();
@@ -482,17 +494,22 @@ export class LooperRender extends AbstractHTMLRender {
                 if (this.looper.sliceSettings[i]?.muted) {
                     marker.classList.add('muted');
                 }
+                if (this.looper.sliceSettings[i]?.reversed) {
+                    marker.classList.add('reversed');
+                }
                 
                 const controls = document.createElement('div');
                 controls.className = 'slice-controls';
                 controls.innerHTML = `
                     <button class="copy-btn" title="Copy Slice">C</button>
                     <button class="mute-btn ${this.looper.sliceSettings[i]?.muted ? 'active' : ''}" title="Mute Slice">M</button>
+                    <button class="reverse-btn ${this.looper.sliceSettings[i]?.reversed ? 'active' : ''}" title="Reverse Slice">R</button>
                     <button class="paste-btn" title="Paste Slice">P</button>
                 `;
                 
                 const muteBtn = controls.querySelector('.mute-btn');
                 const copyBtn = controls.querySelector('.copy-btn');
+                const reverseBtn = controls.querySelector('.reverse-btn');
                 const pasteBtn = controls.querySelector('.paste-btn');
                 
                 muteBtn.addEventListener('click', (e) => {
@@ -500,6 +517,13 @@ export class LooperRender extends AbstractHTMLRender {
                     this.looper.toggleSliceMute(i);
                     muteBtn.classList.toggle('active');
                     marker.classList.toggle('muted');
+                });
+                
+                reverseBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.looper.toggleSliceReverse(i);
+                    reverseBtn.classList.toggle('active');
+                    marker.classList.toggle('reversed');
                 });
                 
                 copyBtn.addEventListener('click', (e) => {

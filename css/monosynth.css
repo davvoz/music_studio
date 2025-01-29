@@ -97,17 +97,6 @@
 }
 
 
-
-/* Sequencer styling */
-.sequence-grid {
-    display: grid;
-    grid-template-columns: repeat(16, 1fr);
-    gap: 2px;
-    background: #333;
-    padding: 10px;
-    border-radius: 0;
-}
-
 .sequence-step {
     display: flex;
     flex-direction: column;

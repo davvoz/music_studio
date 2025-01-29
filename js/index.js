@@ -5,6 +5,7 @@ import { DrumMachine } from './audio-components/instruments/drummer/DrumMachine.
 import { Sampler } from './audio-components/instruments/sampler/Sampler.js';
 import { MIDIManager } from './core/MIDIManager.js';
 import { Looper } from './audio-components/instruments/looper/Looper.js';
+import { AIComposer } from './audio-components/instruments/ai-composer/AIComposer.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
     const audioEngine = new AudioEngine();
@@ -21,8 +22,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.body.appendChild(renderEngine.render());
 
-   
-    
     // Forward MIDI messages to each instrument
     midiManager.addHandler((message) => {
         audioEngine.instruments.forEach(inst => {

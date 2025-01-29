@@ -116,16 +116,6 @@ button.active {
     background: #e74c3c;
 }
 
-.sequence-grid {
-    display: grid;
-    grid-template-columns: repeat(16, 1fr);
-    gap: 4px;
-    margin: 10px 0;
-    padding: 10px;
-    background: #34495e;
-    border-radius: 4px;
-}
-
 .sequence-step {
     text-align: center;
 }

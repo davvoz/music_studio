@@ -1,0 +1,135 @@
+.ai-composer {
+    background: #2C3137;
+    padding: 15px;
+    border-radius: 8px;
+    width: 100%;
+    /* max-width: 800px; */
+    /* height: 400px; */
+    display: flex
+;
+    flex-direction: row;
+    gap: 15px;
+    overflow: hidden;
+}
+
+/* Pannello principale (a sinistra) */
+.ai-composer-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    padding-right: 15px;
+    min-width: 300px;
+}
+
+/* Sequencer (a destra) */
+.sequence-grid {
+    flex: 1;
+    display: grid
+;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 2px;
+    background: #1E2328;
+    padding: 10px;
+    border-radius: 6px;
+    align-self: stretch;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.sequence-grid .step {
+    aspect-ratio: 1; /* Mantiene forma quadrata */
+    min-width: 30px; /* Dimensione minima */
+    min-height: 30px;
+    background: rgba(255, 149, 0, 0.1);
+    border-radius: 4px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.1s ease;
+}
+
+.sequence-grid .step:hover {
+    background: rgba(255, 149, 0, 0.2);
+}
+
+.sequence-grid .step.active {
+    background: rgba(255, 149, 0, 0.3);
+}
+
+.sequence-grid .step.current {
+    background-color:       #FF9500;
+    color: #1e2328;
+}
+
+.sequence-grid .note-display {
+    color: #FF9500;
+    font-family: monospace;
+    font-size: 12px;
+    pointer-events: none;
+}
+
+/* Controls styling */
+.controls-section {
+    width: 300px; /* Larghezza fissa per i controlli */
+    flex-shrink: 0; /* Impedisce il restringimento */
+    background: #1E2328;
+    padding: 15px;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    overflow-y: auto; /* Scroll verticale se necessario */
+}
+
+.control-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.control-group label {
+    color: #808080;
+    font-size: 12px;
+    min-width: 80px;
+}
+
+.control-group select,
+.control-group input[type="range"] {
+    flex: 1;
+    background: #2C3137;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    color: #FF9500;
+    padding: 5px;
+    border-radius: 4px;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.controls-section button {
+    background: #FF9500;
+    color: #1E2328;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.2s ease;
+}
+
+.controls-section button:hover {
+    background: #FFB042;
+}
+
+.controls-section  button.active {
+    background: #FF9500;
+    color: #1E2328;
+}
+
+

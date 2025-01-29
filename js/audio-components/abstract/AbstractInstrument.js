@@ -40,6 +40,8 @@ export class AbstractInstrument extends AbstractAudioComponent {
         
         // Start VU meter
         this.vuMeter.start();
+
+        this.audioContext = context; // Aggiungi questa riga
     }
     
     render() {
