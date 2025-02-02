@@ -1030,7 +1030,7 @@
     color: #1E2328;
 }
 
-/* ...existing code... */
+
 
 .slice-controls {
     position: absolute;
@@ -1068,7 +1068,7 @@
     justify-content: center;
 }
 
-/* ...existing code... */
+
 
 .slice-controls button.copy-btn,
 .slice-controls button.paste-btn {
@@ -1103,7 +1103,7 @@
     background: rgba(30, 35, 40, 0.9); /* Sfondo più scuro per i controlli su slice reversed */
 }
 
-/* ...existing code... */
+
 
 
 

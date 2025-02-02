@@ -206,6 +206,7 @@ export class AudioEngine {
     removeInstrument(id) {
         const instrument = this.instruments.get(id);
         if (instrument) {
+            instrument.cleanup?.(); // Aggiungi questa riga
             instrument.disconnect();
             this.instruments.delete(id);
         }

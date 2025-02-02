@@ -74,17 +74,7 @@
     margin-top: 10px;
 }
 
-.effects-controls {
-    grid-column: 1 / -1;
-    display: flex;
-    gap: 20px;
-    justify-content: center;
-    padding: 15px;
-    background: var(--primary-bg);
-    border-radius: 8px;
-    border: 1px solid var(--border-light);
-    margin-top: 10px;
-}
+
 
 .effect-group {
     display: flex;

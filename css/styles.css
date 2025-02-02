@@ -558,7 +558,7 @@ body {
     box-shadow: 0 0 10px rgba(241, 196, 15, 0.3);
 }
 
-/* ...existing code... */
+
 
 .volume-container {
     position: relative;
@@ -582,7 +582,7 @@ body {
     bottom: -25px;
 }
 
-/* ...existing code... */
+
 
 .midi-tooltip {
     position: fixed;
@@ -616,7 +616,7 @@ body {
     white-space: nowrap;
 }
 
-/* ...existing code... */
+
 
 .midi-learning {
     animation: pulse 1.5s infinite;
@@ -635,4 +635,3 @@ body {
     font-weight: bold;
 }
 
-/* ...existing code... */

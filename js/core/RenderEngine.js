@@ -3,6 +3,7 @@ import { DrumMachine } from '../audio-components/instruments/drummer/DrumMachine
 import { Sampler } from '../audio-components/instruments/sampler/Sampler.js';  // Aggiungi questa riga
 import { Looper } from '../audio-components/instruments/looper/Looper.js';  // Aggiungi questa riga
 import { AIComposer } from '../audio-components/instruments/ai-composer/AIComposer.js';
+import { FMSynth } from '../audio-components/instruments/fm-synth/FMSynth.js';
 
 export class RenderEngine {
     constructor(audioEngine) {
@@ -308,6 +309,7 @@ export class RenderEngine {
             case 'Sampler': return Sampler;
             case 'Looper': return Looper;
             case 'AIComposer': return AIComposer;
+            case 'FMSynth': return FMSynth;
             default: return null;
         }
     }
@@ -618,7 +620,8 @@ export class RenderEngine {
             { id: 'drummer', name: 'Drum Machine', class: DrumMachine },
             { id: 'sampler', name: 'Sampler', class: Sampler }  ,// Aggiungi questa riga
             { id: 'looper', name: 'Looper', class: Looper }  ,
-            { id: 'ai-composer', name: 'AI Composer', class: AIComposer }
+            { id: 'ai-composer', name: 'AI Composer', class: AIComposer },
+            { id: 'fm-synth', name: 'FM Synth', class: FMSynth }
         ];
         
         const list = document.createElement('div');

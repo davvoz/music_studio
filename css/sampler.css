@@ -313,7 +313,7 @@
     100% { border-color: rgba(255, 149, 0, 0.3); }
 }
 
-/* ...existing code... */
+
 
 .pattern-types {
     display: flex;
@@ -379,7 +379,7 @@
     border-left: 2px solid rgba(255, 149, 0, 0.3);
 }
 
-/* ...existing code... */
+
 
 .sequence-cell.pattern-inactive {
     opacity: 0.3;
@@ -392,7 +392,7 @@
 
 /* ...rest of existing code... */
 
-/* ...existing code... */
+
 
 .global-controls {
     display: flex;
@@ -441,7 +441,7 @@
     box-shadow: 0 0 4px rgba(255, 149, 0, 0.5);
 }
 
-/* ...existing code... */
+
 
 .global-gain {
     width: 120px;
@@ -467,4 +467,3 @@
     box-shadow: 0 0 4px rgba(0, 255, 157, 0.5);
 }
 
-/* ...existing code... */
