@@ -52,15 +52,19 @@ export class AbstractInstrument extends AbstractAudioComponent {
         mixerSection.className = 'rack-mixer';
         
         // Volume controls
-        const volumeKnob = document.createElement('input');
-        volumeKnob.type = 'range';
-        volumeKnob.min = 0;
-        volumeKnob.max = 1;
-        volumeKnob.step = 0.01;
-        volumeKnob.value = this.rackVolume.gain.value;
-        volumeKnob.className = 'rack-volume';
+        const volumeContainer = document.createElement('div');
+        volumeContainer.className = 'volume-container';
 
-        // Aggiungi il pulsante MIDI learn
+        // Volume slider
+        const volumeSlider = document.createElement('input');
+        volumeSlider.type = 'range';
+        volumeSlider.min = 0;
+        volumeSlider.max = 1;
+        volumeSlider.step = 0.01;
+        volumeSlider.value = this.rackVolume.gain.value;
+        volumeSlider.className = 'rack-volume';
+
+        // MIDI learn button for volume
         const midiLearnBtn = document.createElement('button');
         midiLearnBtn.className = 'midi-learn-btn';
         midiLearnBtn.innerHTML = '<span>MIDI</span>';
@@ -71,6 +75,14 @@ export class AbstractInstrument extends AbstractAudioComponent {
             e.stopPropagation();
             clearTimeout(learningTimeout);
             
+            // Reset altri pulsanti MIDI learn
+            container.querySelectorAll('.midi-learn-btn.learning').forEach(btn => {
+                if (btn !== midiLearnBtn) {
+                    btn.classList.remove('learning');
+                    this.midiMapping.stopLearning();
+                }
+            });
+
             const isLearning = midiLearnBtn.classList.toggle('learning');
             if (isLearning) {
                 this.midiMapping.startLearning('volume');
@@ -82,19 +94,15 @@ export class AbstractInstrument extends AbstractAudioComponent {
                 this.midiMapping.stopLearning();
             }
         });
-        
-        // Volume knob container
-        const volumeContainer = document.createElement('div');
-        volumeContainer.className = 'volume-container';
-        volumeContainer.appendChild(volumeKnob);
-        volumeContainer.appendChild(midiLearnBtn);
-        
-        volumeKnob.addEventListener('input', (e) => {
+
+        volumeSlider.addEventListener('input', (e) => {
             const value = parseFloat(e.target.value);
             this.setVolume(value);
-            this.vuMeter.setVolume(value);
+            this.vuMeter?.setVolume(value);
         });
-        
+
+        volumeContainer.appendChild(volumeSlider);
+        volumeContainer.appendChild(midiLearnBtn);
         mixerSection.appendChild(volumeContainer);
         mixerSection.appendChild(this.vuMeter.getElement());
         
@@ -143,13 +151,28 @@ export class AbstractInstrument extends AbstractAudioComponent {
     }
 
     onMIDIMessage(message) {
+        // Prima gestisci il MIDI mapping
         const result = this.midiMapping.handleMIDIMessage(message);
-        if (result.mapped && result.param === 'volume') {
-            this.setVolume(result.value);
-            // Aggiorna UI
-            const volumeKnob = this.renderer.container.querySelector('.rack-volume');
-            if (volumeKnob) {
-                volumeKnob.value = result.value;
+        console.log('AbstractInstrument MIDI result:', result);
+        
+        if (result.mapped) {
+            // Gestisci i controlli del rack
+            if (result.param === 'volume') {
+                const value = result.value;
+                this.setVolume(value);
+                
+                // Aggiorna UI
+                const volumeSlider = this.renderer.container.querySelector('.rack-volume');
+                if (volumeSlider) {
+                    volumeSlider.value = value;
+                    volumeSlider.dispatchEvent(new Event('input'));
+                }
+                return;
+            }
+
+            // Lascia che le classi figlie gestiscano i loro controlli specifici
+            if (this.handleInstrumentMIDI) {
+                this.handleInstrumentMIDI(message);
             }
         }
     }

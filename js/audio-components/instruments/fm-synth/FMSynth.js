@@ -257,6 +257,17 @@ export class FMSynth extends AbstractInstrument {
             lfo2Division: '1/8'
         };
 
+        // Inizializza gli inviluppi
+        this.envelopes = {
+            cutoff: new Envelope(),
+            resonance: new Envelope(),
+            modDepth: new Envelope(),
+            carrierGain: new Envelope(),
+            feedback: new Envelope(),
+            modRatio: new Envelope(),
+            // Aggiungi altri parametri che vuoi modulare
+        };
+
         // Setup audio
         this.setupAudio();  // Solo una volta!
 
@@ -479,6 +490,27 @@ export class FMSynth extends AbstractInstrument {
     }
 
     updateParameter(param, value) {
+        // Gestione inviluppi
+        if (param.endsWith('Envelope')) {
+            const baseParam = param.replace('Envelope', '');
+            if (this.envelopes[baseParam]) {
+                const env = this.envelopes[baseParam];
+                
+                // Aggiorna lo stato dell'inviluppo
+                env.active = value.active;
+                if (value.active) {
+                    env.points = value.points;
+                    env.length = value.length;
+                } else {
+                    // Se disattivato, resetta al valore base del parametro
+                    env.points = [];
+                    env.length = 1;
+                    this.updateParameter(baseParam, this.parameters[baseParam]);
+                }
+                return;
+            }
+        }
+
         this.parameters[param] = value;
 
         // Aggiungi i nuovi parametri ADSR
@@ -788,6 +820,9 @@ export class FMSynth extends AbstractInstrument {
             if (this.parameters.lfo1Sync) this.updateLFO(1);
             if (this.parameters.lfo2Sync) this.updateLFO(2);
         }
+
+        // Processa gli inviluppi attivi
+        this.processEnvelopes(time);
     }
 
     playNote(frequency, time, accent = false, slide = false) {
@@ -857,5 +892,60 @@ export class FMSynth extends AbstractInstrument {
             points: env?.points || [],
             length: env?.length || 1
         };
+    }
+
+    processEnvelopes(time) {
+        if (!time) return;
+
+        const now = this.context.currentTime;
+        const tempo = this.parameters.tempo;
+
+        Object.entries(this.envelopes).forEach(([param, env]) => {
+            if (!env.active || !env.points || env.points.length < 2) return;
+
+            try {
+                // Calcola la posizione nel ciclo
+                const cycleDuration = (env.length * 240) / tempo; // 4 beat per bar * length
+                const cyclePosition = ((now % cycleDuration) / cycleDuration);
+
+                // Trova i punti corretti per l'interpolazione
+                let startPoint = env.points[0];
+                let endPoint = env.points[1];
+
+                for (let i = 0; i < env.points.length - 1; i++) {
+                    if (cyclePosition >= env.points[i].time && cyclePosition < env.points[i + 1].time) {
+                        startPoint = env.points[i];
+                        endPoint = env.points[i + 1];
+                        break;
+                    }
+                }
+
+                // Calcola il valore interpolato
+                const segmentPos = (cyclePosition - startPoint.time) / (endPoint.time - startPoint.time);
+                const value = startPoint.value + (endPoint.value - startPoint.value) * segmentPos;
+
+                // Aggiorna il parametro
+                this.updateParameter(param, value);
+                
+                // Notifica il renderer
+                if (this.renderer) {
+                    requestAnimationFrame(() => {
+                        this.renderer.updateParameter(param, value);
+                    });
+                }
+
+                // Debug
+                if (this.DEBUG) {
+                    console.log(`Envelope ${param}:`, {
+                        cyclePosition,
+                        value,
+                        startPoint,
+                        endPoint
+                    });
+                }
+            } catch (error) {
+                console.warn('Error in envelope processing:', error);
+            }
+        });
     }
 }

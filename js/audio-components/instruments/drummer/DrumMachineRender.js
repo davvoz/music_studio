@@ -2,9 +2,17 @@ import { AbstractHTMLRender } from "../../abstract/AbstractHTMLRender.js";
 import { Knob } from "../../../components/Knob.js";
 
 export class DrumMachineRender extends AbstractHTMLRender {
-    constructor(instanceId) {
+    constructor(instanceId, drumMachine) {  // Aggiungi il parametro drumMachine
         super();
+        if (!instanceId) {
+            throw new Error('instanceId is required');
+        }
+        if (!drumMachine) {
+            throw new Error('drumMachine instance is required');
+        }
+
         this.instanceId = instanceId;
+        this.drumMachine = drumMachine;  // Salva il riferimento all'istanza DrumMachine
         this.container.classList.add('drum-machine');
         this.container.setAttribute('data-instance-id', this.instanceId);
         this.paramChangeCallback = null;
@@ -44,10 +52,22 @@ export class DrumMachineRender extends AbstractHTMLRender {
                 <div class="drum-knobs"></div>
                 <div class="pattern-selectore">
                     <div class="pattern-memory">
-                        <button class="memory-btn" data-slot="1">1</button>
-                        <button class="memory-btn" data-slot="2">2</button>
-                        <button class="memory-btn" data-slot="3">3</button>
-                        <button class="memory-btn" data-slot="4">4</button>
+                        <div class="memory-slot" data-slot="1">
+                            <button class="memory-btn" data-slot="1">1</button>
+                            <button class="midi-learn-btn" data-param="pattern1"><span>MIDI</span></button>
+                        </div>
+                        <div class="memory-slot" data-slot="2">
+                            <button class="memory-btn" data-slot="2">2</button>
+                            <button class="midi-learn-btn" data-param="pattern2"><span>MIDI</span></button>
+                        </div>
+                        <div class="memory-slot" data-slot="3">
+                            <button class="memory-btn" data-slot="3">3</button>
+                            <button class="midi-learn-btn" data-param="pattern3"><span>MIDI</span></button>
+                        </div>
+                        <div class="memory-slot" data-slot="4">
+                            <button class="memory-btn" data-slot="4">4</button>
+                            <button class="midi-learn-btn" data-param="pattern4"><span>MIDI</span></button>
+                        </div>
                     </div>
                     <div class="pattern-actionse">
                         <button class="save-btn">SAVE</button>
@@ -210,13 +230,64 @@ export class DrumMachineRender extends AbstractHTMLRender {
     }
 
     setupEventListeners() {
-        this.container.addEventListener('click', (e) => {
-            const target = e.target;
-            if (target.closest('.memory-btn')) {
-                this.handleMemoryClick(target.closest('.memory-btn'));
-            } else if (target.closest('.save-btn')) {
-                this.handleSaveClick(target.closest('.save-btn'));
+        const handlers = {
+            'click': {
+                '.memory-btn': (e, target) => {
+                    // Corretto il nome del metodo
+                    if (this.isSaveMode) {
+                        this.handleSaveMode(target);
+                    } else {
+                        this.handleLoadMode(target);
+                    }
+                },
+                '.save-btn': (e, target) => {
+                    this.isSaveMode = !this.isSaveMode;
+                    this.container.querySelectorAll('.memory-btn').forEach(btn => {
+                        btn.classList.toggle('saving', this.isSaveMode);
+                    });
+                },
+                '.memory-slot .midi-learn-btn': (e, target) => {
+                    e.stopPropagation();
+                    
+                    // Reset altri pulsanti MIDI learn
+                    this.container.querySelectorAll('.midi-learn-btn.learning').forEach(btn => {
+                        if (btn !== target) {
+                            btn.classList.remove('learning');
+                            this.drumMachine.midiMapping.stopLearning();
+                        }
+                    });
+
+                    // Toggle learning mode
+                    const isLearning = target.classList.toggle('learning');
+                    
+                    if (isLearning) {
+                        this.drumMachine.midiMapping.startLearning(target.dataset.param);
+                        
+                        // Timeout di sicurezza
+                        setTimeout(() => {
+                            if (target.classList.contains('learning')) {
+                                target.classList.remove('learning');
+                                this.drumMachine.midiMapping.stopLearning();
+                            }
+                        }, 10000);
+                    } else {
+                        this.drumMachine.midiMapping.stopLearning();
+                    }
+                }
             }
+        };
+
+        // Use a single event listener per type with delegation
+        Object.entries(handlers).forEach(([eventType, eventHandlers]) => {
+            this.container.addEventListener(eventType, (e) => {
+                for (const [selector, handler] of Object.entries(eventHandlers)) {
+                    const target = e.target.closest(selector);
+                    if (target) {
+                        handler(e, target);
+                        break;
+                    }
+                }
+            }, { passive: eventType !== 'click' });
         });
     }
 
@@ -255,17 +326,19 @@ export class DrumMachineRender extends AbstractHTMLRender {
 
     handleSaveMode(btn) {
         if (this.isSaving) return;  // Prevent multiple saves
+        
         this.isSaving = true;
         
         const slot = btn.dataset.slot;
-        this.paramChangeCallback?.('savePattern', slot);
+        this.savePattern(slot);  // Chiamiamo direttamente savePattern invece di usare il callback
         this.isSaveMode = false;
         
         this.container.querySelectorAll('.memory-btn').forEach(b => b.classList.remove('saving'));
         btn.classList.add('saved');
+        
         setTimeout(() => {
             btn.classList.remove('saved');
-            this.isSaving = false;
+            this.isSaving = false;  // Reset isSaving dopo il timeout
         }, 300);
     }
 
@@ -280,8 +353,8 @@ export class DrumMachineRender extends AbstractHTMLRender {
         // Aggiungi la classe active solo al pulsante selezionato
         btn.classList.add('active');
         
-        // Chiama il callback per caricare il pattern
-        this.paramChangeCallback?.('loadPattern', slot);
+        // Carica direttamente il pattern
+        this.loadPattern(slot);
     }
 
     applyPattern(pattern) {

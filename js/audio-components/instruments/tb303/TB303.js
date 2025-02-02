@@ -67,19 +67,6 @@ export class TB303 extends AbstractInstrument {
         
         // Carica gli inviluppi salvati
         this.loadEnvelopes();
-
-        // Override onMIDIMessage per gestire sia i messaggi specifici del TB303 che quelli ereditati
-        this.onMIDIMessage = (message) => {
-            // Prima proviamo a gestire il messaggio come un normale strumento
-            super.onMIDIMessage(message);
-            
-            // Poi gestiamo i messaggi specifici del TB303
-            const result = this.midiMapping.handleMIDIMessage(message);
-            if (result.mapped && result.param !== 'volume') { // Ignoriamo volume perché già gestito da super
-                this.updateParameter(result.param, result.value);
-                this.renderer.updateKnobValue(result.param, result.value);
-            }
-        };
     }
 
     setupAudio() {
@@ -643,11 +630,31 @@ export class TB303 extends AbstractInstrument {
         };
     }
 
-    // Aggiungi questo metodo per gestire i messaggi MIDI
-    onMIDIMessage(message) {
+    // Sostituisci onMIDIMessage con handleInstrumentMIDI
+    handleInstrumentMIDI(message) {
         const result = this.midiMapping.handleMIDIMessage(message);
+        console.log('TB303 MIDI result:', result, 'from message:', message.data);
+        
         if (result.mapped) {
-            if (result.value !== undefined) {
+            if (result.trigger && result.param?.startsWith('pattern')) {
+                // Estrai il numero dal nome del pattern (pattern1 -> 1)
+                const patternNum = result.param.replace('pattern', '');
+                console.log('Loading pattern from MIDI:', patternNum);
+                
+                // Prima attiva visualmente il pulsante
+                const buttons = this.renderer.container.querySelectorAll('.memory-btn');
+                buttons.forEach(btn => btn.classList.remove('active'));
+                
+                const selectedBtn = this.renderer.container.querySelector(`.memory-btn[data-slot="${patternNum}"]`);
+                if (selectedBtn) {
+                    selectedBtn.classList.add('active');
+                }
+
+                // Forza il caricamento del pattern
+                this.renderer.loadPattern(patternNum);
+                console.log('Pattern loaded:', patternNum);
+            } else if (!result.param?.startsWith('pattern')) {
+                // Gestisci i controlli normali (non pattern)
                 this.updateParameter(result.param, result.value);
                 this.renderer.updateKnobValue(result.param, result.value);
             }

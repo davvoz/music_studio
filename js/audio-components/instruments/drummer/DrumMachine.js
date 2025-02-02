@@ -5,10 +5,13 @@ import { MIDIMapping } from "../../../core/MIDIMapping.js";  // Add this import
 export class DrumMachine extends AbstractInstrument {
     constructor(context) {
         super(context);
-        // Aggiungi un ID univoco per ogni istanza
+        
+        // Inizializza prima l'ID e il MIDI mapping
         this.instanceId = 'drum_' + Date.now();
-        // Passa l'ID al renderer
-        this.renderer = new DrumMachineRender(this.instanceId);
+        this.midiMapping = new MIDIMapping();
+
+        // Ora crea il renderer passando sia l'ID che l'istanza
+        this.renderer = new DrumMachineRender(this.instanceId, this);
 
         this.drums = {
             kick: { buffer: null },
@@ -179,6 +182,29 @@ export class DrumMachine extends AbstractInstrument {
         }
     }
 
+    onBeat(beat, time) {
+        // Calcola correttamente l'indice dello step considerando la suddivisione in due parti
+        const stepIndex = beat % 32;
+        if (stepIndex >= this.selectedLength) return;
+        
+        const safeTime = Math.max(this.context.currentTime, time);
+        
+        requestAnimationFrame(() => {
+            this.renderer.highlightStep?.(stepIndex);
+        });
+
+        for (const [drum, sequence] of Object.entries(this.sequence)) {
+            const step = sequence[stepIndex];
+            if (step?.active && this.drums[drum]?.buffer) {
+                // Normalizza il volume per evitare differenze tra le due metà
+                const normalizedVelocity = Math.min(step.velocity, 1.5);
+                // Applica il volume corretto considerando sia il volume del drum che la velocity dello step
+                const finalVolume = normalizedVelocity * this.parameters[`${drum}Volume`];
+                this.playSample(drum, safeTime, finalVolume);
+            }
+        }
+    }
+
     playSample(name, time, velocity = 1) {
         if (!this.drums[name]?.buffer || !this.context) return;
 
@@ -192,7 +218,9 @@ export class DrumMachine extends AbstractInstrument {
                 this.context.currentTime
             );
 
-            gain.gain.setValueAtTime(velocity, time);
+            // Normalizza il volume per evitare valori troppo alti
+            const normalizedVolume = Math.min(velocity, 1.5);
+            gain.gain.setValueAtTime(normalizedVolume, time);
 
             source.connect(gain);
             gain.connect(this.drums[name].gain);
@@ -206,25 +234,6 @@ export class DrumMachine extends AbstractInstrument {
             };
         } catch (error) {
             console.warn('Sample playback error:', error);
-        }
-    }
-
-    onBeat(beat, time) {
-        // Loop continuo su 32 step
-        const stepIndex = beat % 32;
-        if (stepIndex >= this.selectedLength) return;
-        
-        const safeTime = Math.max(this.context.currentTime, time);
-        
-        requestAnimationFrame(() => {
-            this.renderer.highlightStep?.(stepIndex);
-        });
-
-        for (const [drum, sequence] of Object.entries(this.sequence)) {
-            const step = sequence[stepIndex];
-            if (step?.active && this.drums[drum]?.buffer) {
-                this.playSample(drum, safeTime, step.velocity);
-            }
         }
     }
 
@@ -306,6 +315,53 @@ export class DrumMachine extends AbstractInstrument {
             this.midiMapping.setMappings(mappings);
             // Aggiorna l'UI se necessario
             this.renderer?.updateMIDIMappings?.(mappings);
+        }
+    }
+
+    // Sostituisci onMIDIMessage con handleInstrumentMIDI
+    handleInstrumentMIDI(message) {
+        const result = this.midiMapping.handleMIDIMessage(message);
+        console.log('DrumMachine MIDI result:', result, 'from message:', message.data);
+        
+        if (result.mapped) {
+            if (result.trigger && result.param?.startsWith('pattern')) {
+                // Estrai il numero del pattern
+                const patternNum = result.param.replace('pattern', '');
+                console.log('Loading drum pattern from MIDI:', patternNum);
+                
+                // Prima attiva visualmente il pulsante
+                const buttons = this.renderer.container.querySelectorAll('.memory-btn');
+                buttons.forEach(btn => btn.classList.remove('active'));
+                
+                const selectedBtn = this.renderer.container.querySelector(`.memory-btn[data-slot="${patternNum}"]`);
+                if (selectedBtn) {
+                    selectedBtn.classList.add('active');
+                }
+
+                // Carica il pattern
+                const savedPattern = localStorage.getItem(`${this.instanceId}-pattern-${patternNum}`);
+                if (savedPattern) {
+                    const pattern = JSON.parse(savedPattern);
+                    
+                    // Reset della sequenza prima di caricare il nuovo pattern
+                    this.clearPattern();
+                    
+                    // Carica il nuovo pattern
+                    Object.entries(pattern).forEach(([drum, steps]) => {
+                        if (this.sequence[drum]) {
+                            this.sequence[drum] = steps.map(value => ({
+                                active: value > 0,
+                                velocity: value === 2 ? 1.5 : value === 1 ? 1 : 0
+                            }));
+                        }
+                    });
+
+                    // Aggiorna l'interfaccia
+                    this.renderer.updateSequenceDisplay(this.sequence);
+                    localStorage.setItem(`${this.instanceId}-last-pattern`, patternNum);
+                    console.log('Drum pattern loaded:', patternNum);
+                }
+            }
         }
     }
 }

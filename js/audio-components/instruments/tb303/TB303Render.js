@@ -94,10 +94,22 @@ export class TB303Render extends AbstractHTMLRender {
                         </div>
                     </div>
                     <div class="pattern-memory">
-                        <button class="memory-btn" data-slot="1">1</button>
-                        <button class="memory-btn" data-slot="2">2</button>
-                        <button class="memory-btn" data-slot="3">3</button>
-                        <button class="memory-btn" data-slot="4">4</button>
+                        <div class="memory-slot" data-slot="1">
+                            <button class="memory-btn" data-slot="1">1</button>
+                            <button class="midi-learn-btn" data-param="pattern1"><span>MIDI</span></button>
+                        </div>
+                        <div class="memory-slot" data-slot="2">
+                            <button class="memory-btn" data-slot="2">2</button>
+                            <button class="midi-learn-btn" data-param="pattern2"><span>MIDI</span></button>
+                        </div>
+                        <div class="memory-slot" data-slot="3">
+                            <button class="memory-btn" data-slot="3">3</button>
+                            <button class="midi-learn-btn" data-param="pattern3"><span>MIDI</span></button>
+                        </div>
+                        <div class="memory-slot" data-slot="4">
+                            <button class="memory-btn" data-slot="4">4</button>
+                            <button class="midi-learn-btn" data-param="pattern4"><span>MIDI</span></button>
+                        </div>
                     </div>
                     <div class="pattern-actions">
                         <button class="save-btn">SAVE</button>
@@ -560,7 +572,37 @@ export class TB303Render extends AbstractHTMLRender {
                 '.memory-btn': this.handleMemoryButtonClick.bind(this),
                 '.save-btn': this.handleSaveButtonClick.bind(this),
                 '.length-btn': this.handleLengthButtonClick.bind(this),
-                '.transpose-btn': this.handleTransposeButtonClick.bind(this)
+                '.transpose-btn': this.handleTransposeButtonClick.bind(this),
+                // Aggiungi handler per i pulsanti MIDI learn dei pattern
+                '.memory-slot .midi-learn-btn': (e, target) => {
+                    // Remove preventDefault since we're using a delegated event
+                    // instead of direct event listener
+                    
+                    // Reset altri pulsanti MIDI learn
+                    this.container.querySelectorAll('.midi-learn-btn.learning').forEach(btn => {
+                        if (btn !== target) {
+                            btn.classList.remove('learning');
+                            this.tb303.midiMapping.stopLearning();
+                        }
+                    });
+
+                    // Toggle learning mode
+                    const isLearning = target.classList.toggle('learning');
+                    
+                    if (isLearning) {
+                        this.tb303.midiMapping.startLearning(target.dataset.param);
+                        
+                        // Timeout di sicurezza (10 secondi)
+                        setTimeout(() => {
+                            if (target.classList.contains('learning')) {
+                                target.classList.remove('learning');
+                                this.tb303.midiMapping.stopLearning();
+                            }
+                        }, 10000);
+                    } else {
+                        this.tb303.midiMapping.stopLearning();
+                    }
+                }
             },
             'change': {
                 '.note': this.handleNoteChange.bind(this),
@@ -583,7 +625,7 @@ export class TB303Render extends AbstractHTMLRender {
                         break;
                     }
                 }
-            }, { passive: true });
+            }, { passive: eventType !== 'click' }); // Only click events should be non-passive
         });
     }
 

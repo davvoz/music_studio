@@ -481,29 +481,14 @@ export class FMSynthRender extends AbstractHTMLRender {
         });
     }
 
-    updateParameter(param, value) {
-        // Controlla se il parametro ha un inviluppo attivo
-        const envState = this.fmSynth.getEnvelopeState(param);
-        if (envState.active) {
-            // Aggiorna lo stato visuale del pulsante ENV
-            const envButton = this.container.querySelector(`.env-button[data-param="${param}"]`);
-            if (envButton) {
-                envButton.classList.add('has-envelope');
-            }
-        }
-
-        // Aggiorna il knob solo se esiste
+    updateParameter(param, value, isModulation = false) {
         const knob = this.knobs.get(param);
         if (knob) {
-            // Aggiorna il valore senza triggerare l'evento onChange
             knob.setValue(value, true);
             
-            // Aggiungi classe di animazione al knob
-            const knobElement = this.container.querySelector(`[data-param="${param}"] .knob`);
-            if (knobElement) {
-                knobElement.classList.add('modulating');
-                // Rimuovi la classe dopo un breve delay
-                setTimeout(() => knobElement.classList.remove('modulating'), 100);
+            const wrap = this.container.querySelector(`[data-param="${param}"]`);
+            if (wrap) {
+                wrap.classList.toggle('modulated', isModulation);
             }
         }
     }
