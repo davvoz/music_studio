@@ -153,28 +153,26 @@ export class AbstractInstrument extends AbstractAudioComponent {
     onMIDIMessage(message) {
         // Prima gestisci il MIDI mapping
         const result = this.midiMapping.handleMIDIMessage(message);
-        console.log('AbstractInstrument MIDI result:', result);
         
         if (result.mapped) {
-            // Gestisci i controlli del rack
+            // Gestione del volume
             if (result.param === 'volume') {
-                const value = result.value;
-                this.setVolume(value);
-                
-                // Aggiorna UI
+                this.setVolume(result.value);
                 const volumeSlider = this.renderer.container.querySelector('.rack-volume');
                 if (volumeSlider) {
-                    volumeSlider.value = value;
+                    volumeSlider.value = result.value;
                     volumeSlider.dispatchEvent(new Event('input'));
                 }
-                return;
+                return true;
             }
-
-            // Lascia che le classi figlie gestiscano i loro controlli specifici
-            if (this.handleInstrumentMIDI) {
-                this.handleInstrumentMIDI(message);
+            
+            // Gestione di altri parametri mappati
+            if (this.handleInstrumentMIDI && typeof this.handleInstrumentMIDI === 'function') {
+                return this.handleInstrumentMIDI(message);
             }
         }
+        
+        return false;
     }
 }
 

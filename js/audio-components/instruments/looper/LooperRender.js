@@ -26,6 +26,32 @@ export class LooperRender extends AbstractHTMLRender {
                             <button class="add-sound-btn" title="Add new sound">+</button>
                             <button class="remove-sound-btn" title="Remove sound">-</button>
                         </div>
+                        <div class="trigger-container">
+                            <div class="trigger-slot">
+                                <div class="trigger-group">
+                                    <button class="trigger-btn" data-slot="0">1</button>
+                                    <button class="midi-learn-btn" data-param="trigger_0">MIDI</button>
+                                </div>
+                            </div>
+                            <div class="trigger-slot">
+                                <div class="trigger-group">
+                                    <button class="trigger-btn" data-slot="1">2</button>
+                                    <button class="midi-learn-btn" data-param="trigger_1">MIDI</button>
+                                </div>
+                            </div>
+                            <div class="trigger-slot">
+                                <div class="trigger-group">
+                                    <button class="trigger-btn" data-slot="2">3</button>
+                                    <button class="midi-learn-btn" data-param="trigger_2">MIDI</button>
+                                </div>
+                            </div>
+                            <div class="trigger-slot">
+                                <div class="trigger-group">
+                                    <button class="trigger-btn" data-slot="3">4</button>
+                                    <button class="midi-learn-btn" data-param="trigger_3">MIDI</button>
+                                </div>
+                            </div>
+                        </div>
                         <div class="clip-title">No clip loaded</div>
                         <div class="clip-status"></div>
                     </div>
@@ -162,6 +188,137 @@ export class LooperRender extends AbstractHTMLRender {
 
         this.setupKeyboardShortcuts();
         this.setupSlicePreview();
+
+        // Gestione del MIDI learn
+        const midiLearnBtn = this.container.querySelector('.sound-selector .midi-learn-btn');
+        if (midiLearnBtn) {
+            midiLearnBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                console.log('MIDI learn clicked'); // Aggiungi questo per debug
+                
+                // Reset altri pulsanti MIDI learn
+                this.container.querySelectorAll('.midi-learn-btn.learning').forEach(btn => {
+                    if (btn !== midiLearnBtn) {
+                        btn.classList.remove('learning');
+                        this.looper.midiMapping.stopLearning();
+                    }
+                });
+
+                const isLearning = midiLearnBtn.classList.toggle('learning');
+                if (isLearning) {
+                    this.looper.midiMapping.startLearning('sound-select');
+                    
+                    setTimeout(() => {
+                        if (midiLearnBtn.classList.contains('learning')) {
+                            midiLearnBtn.classList.remove('learning');
+                            this.looper.midiMapping.stopLearning();
+                        }
+                    }, 10000);
+                } else {
+                    this.looper.midiMapping.stopLearning();
+                }
+            });
+        } else {
+            console.warn('MIDI learn button not found!'); // Aggiungi questo per debug
+        }
+
+        // Gestione dei trigger button
+        this.container.querySelectorAll('.trigger-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const slot = parseInt(btn.dataset.slot);
+                const soundNames = Array.from(this.looper.sounds.keys());
+                const soundName = soundNames[slot];
+                
+                if (soundName) {
+                    this.looper.loadSound(soundName);
+                    this.container.querySelector('.sound-select').value = soundName;
+                }
+            });
+        });
+
+        // Gestione MIDI learn per i trigger
+        this.container.querySelectorAll('.trigger-slot .midi-learn-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                
+                // Reset altri pulsanti MIDI learn
+                this.container.querySelectorAll('.midi-learn-btn.learning').forEach(other => {
+                    if (other !== btn) {
+                        other.classList.remove('learning');
+                        this.looper.midiMapping.stopLearning();
+                    }
+                });
+
+                const isLearning = btn.classList.toggle('learning');
+                if (isLearning) {
+                    this.looper.midiMapping.startLearning(btn.dataset.param);
+                    
+                    setTimeout(() => {
+                        if (btn.classList.contains('learning')) {
+                            btn.classList.remove('learning');
+                            this.looper.midiMapping.stopLearning();
+                        }
+                    }, 10000);
+                } else {
+                    this.looper.midiMapping.stopLearning();
+                }
+            });
+        });
+        this.bindMIDILearnButtons();
+    }
+
+    bindMIDILearnButtons() {
+        // Rimuovi tutti i vecchi listener
+        const buttons = this.container.querySelectorAll('.midi-learn-btn');
+        buttons.forEach(btn => {
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+        });
+
+        // Riattacca i listener
+        this.container.querySelectorAll('.midi-learn-btn').forEach(btn => {
+            // Verifica se esiste già un mapping per questo parametro
+            if (this.looper.midiMapping?.getMappings()[btn.dataset.param]) {
+                btn.classList.add('has-mapping');
+            }
+
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                
+                // Reset altri pulsanti learning
+                this.container.querySelectorAll('.midi-learn-btn.learning').forEach(other => {
+                    if (other !== btn) {
+                        other.classList.remove('learning');
+                        this.looper.midiMapping?.stopLearning();
+                    }
+                });
+
+                const isLearning = !btn.classList.contains('learning');
+                if (isLearning) {
+                    btn.classList.add('learning');
+                    this.looper.midiMapping?.startLearning(btn.dataset.param);
+                } else {
+                    btn.classList.remove('learning');
+                    this.looper.midiMapping?.stopLearning();
+                }
+            });
+        });
+
+        // Un solo listener globale per gli eventi MIDI
+        const midiEventHandler = (e) => {
+            const { param, hasMapping } = e.detail;
+            const btn = this.container.querySelector(`.midi-learn-btn[data-param="${param}"]`);
+            if (btn) {
+                btn.classList.remove('learning');
+                if (hasMapping) {
+                    btn.classList.add('has-mapping');
+                }
+            }
+        };
+
+        // Rimuovi vecchi listener se esistono
+        window.removeEventListener('midi-mapped', midiEventHandler);
+        window.addEventListener('midi-mapped', midiEventHandler);
     }
 
     setupCanvas() {
@@ -612,11 +769,30 @@ export class LooperRender extends AbstractHTMLRender {
         }
     }
 
-    updateSoundsList(soundNames) {
+    updateSoundsList(soundNames, selectedSound = null) {
+        // Prima aggiorna il select principale
         const select = this.container.querySelector('.sound-select');
         select.innerHTML = soundNames.length ? 
-            soundNames.map(name => `<option value="${name}">${name}</option>`).join('') :
+            soundNames.map(name => `<option value="${name}" ${name === selectedSound ? 'selected' : ''}>${name}</option>`).join('') :
             '<option value="">No sounds loaded</option>';
+
+        // Poi aggiorna i trigger
+        this.container.querySelectorAll('.trigger-slot').forEach((slot, index) => {
+            const soundName = soundNames[index];
+            const triggerBtn = slot.querySelector('.trigger-btn');
+            const midiBtn = slot.querySelector('.midi-learn-btn');
+
+            // Aggiorna solo lo stato del trigger button
+            if (triggerBtn) {
+                triggerBtn.disabled = !soundName;
+                triggerBtn.classList.toggle('has-sound', !!soundName);
+                triggerBtn.dataset.soundName = soundName || '';
+            }
+        });
+
+        // Riattiva i MIDI learn buttons
+        this.bindMIDILearnButtons();
+        
         select.value = this.looper.currentSoundName || '';
     }
 

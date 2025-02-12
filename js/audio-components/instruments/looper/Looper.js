@@ -40,6 +40,12 @@ export class Looper extends AbstractInstrument {
         this.initializeSliceSettings();
 
         this.clipboardSlice = null; // Per memorizzare la slice copiata
+
+        // Aggiungi l'inizializzazione dei parametri MIDI
+        this.parameters = {
+            volume: 0.8,
+            ...this.parameters
+        };
     }
 
     initializeSliceSettings() {
@@ -108,15 +114,17 @@ export class Looper extends AbstractInstrument {
         this.pitch = sound.config.pitch;
         this.startingStep = sound.config.startingStep;
         
-        this.updateSliceDuration();
+        // Importante: reinizializza le impostazioni delle slice con le nuove divisions
+        this.initializeSliceSettings();
         
-        // Rigenera i dati della forma d'onda con il nuovo buffer
+        this.updateSliceDuration();
         this.generateWaveformData();
         
         // Forza un aggiornamento completo del display
         requestAnimationFrame(() => {
             this.renderer.updateDisplay(name, this.buffer.duration, this.waveformData);
             this.renderer.updateControls(sound.config);
+            this.renderer.updateGrid(this.divisions); // Aggiungi questa riga
             
             // Riprendi la riproduzione se era attiva
             if (wasPlaying) {
@@ -209,7 +217,13 @@ export class Looper extends AbstractInstrument {
     }
 
     playSliceAtTime(sliceIndex, time) {
-        if (!this.buffer || !this.isPlaying || this.sliceSettings[sliceIndex].muted) return;
+        // Aggiungi questi controlli di sicurezza
+        if (!this.buffer || !this.isPlaying) return;
+        if (!this.sliceSettings || sliceIndex >= this.sliceSettings.length) {
+            console.warn('Invalid slice settings or index:', sliceIndex);
+            return;
+        }
+        if (this.sliceSettings[sliceIndex]?.muted) return;
         
         try {
             const source = this.context.createBufferSource();
@@ -428,5 +442,34 @@ export class Looper extends AbstractInstrument {
         // Aggiorna la visualizzazione
         this.generateWaveformData();
         this.renderer?.drawWaveform();
+    }
+
+    handleInstrumentMIDI(message) {
+        // Non chiamare più super.handleInstrumentMIDI per evitare la ricorsione
+
+        const result = this.midiMapping.handleMIDIMessage(message);
+        if (result.mapped && result.param.startsWith('trigger_')) {
+            const index = parseInt(result.param.split('_')[1]);
+            const soundNames = Array.from(this.sounds.keys());
+            const soundName = soundNames[index];
+            if (soundName) {
+                this.loadSound(soundName);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    updateParameter(param, value) {
+        if (!this.parameters[param]) return;
+        
+        this.parameters[param] = value;
+        
+        switch(param) {
+            case 'pitch':
+                this.setPitch(value * 4); // Scale to 0-4 range
+                break;
+            // Aggiungi altri parametri se necessario
+        }
     }
 }

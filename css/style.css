@@ -1,0 +1,13 @@
+.midi-learn-btn {
+    /* ...existing code... */
+}
+
+.midi-learn-btn.learning {
+    background-color: #ff0000;
+    color: white;
+}
+
+.midi-learn-btn.has-mapping {
+    background-color: #00ff00;
+    color: white;
+}

@@ -995,7 +995,11 @@
     display: flex;
     gap: 8px;
     align-items: center;
+    background: rgba(30, 35, 40, 0.5);
+    padding: 8px;
+    border-radius: 4px;
     margin-bottom: 8px;
+    position: relative;
 }
 
 .sound-select {
@@ -1006,6 +1010,44 @@
     border-radius: 4px;
     font-size: 12px;
     min-width: 150px;
+    flex: 1;
+}
+
+/* Modifica qui - Stili corretti per il pulsante MIDI learn del sound selector */
+.sound-selector .midi-learn-btn {
+    min-width: 40px;
+    height: 24px;
+    padding: 0 8px;
+    background: #1E2328;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: 4px;
+    color: #808080;
+    font-size: 11px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: static; /* Cambiato da relative/absolute */
+    opacity: 1;      /* Assicurati che sia visibile */
+    transform: none; /* Rimuovi eventuali trasformazioni */
+}
+
+.sound-selector .midi-learn-btn:hover {
+    background: #272B33;
+    color: #FF9500;
+    border-color: #FF9500;
+}
+
+.sound-selector .midi-learn-btn.learning {
+    background: rgba(255, 0, 0, 0.8);
+    color: white;
+    border-color: red;
+    animation: pulse 1s infinite;
+}
+
+/* Rimuovi questi stili duplicati o in conflitto */
+.sound-selector .midi-learn-btn {
+    /* Rimuovi eventuali stili duplicati qui */
 }
 
 .add-sound-btn,
@@ -1030,7 +1072,86 @@
     color: #1E2328;
 }
 
+.sound-selector {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    background: rgba(30, 35, 40, 0.5);
+    padding: 4px 8px;
+    border-radius: 4px;
+}
 
+.sound-select {
+    background: #1E2328;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    color: #FF9500;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    min-width: 150px;
+    flex: 1;
+}
+
+/* Stili per il pulsante MIDI learn */
+.sound-selector .midi-learn-btn {
+    position: relative;
+    min-width: 30px;
+    height: 24px;
+    border-radius: 4px;
+    background: rgba(30, 30, 30, 0.9);
+    border: 1px solid #666;
+    color: #999;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 0 8px;
+}
+
+.sound-selector .midi-learn-btn:hover {
+    background: rgba(40, 40, 40, 0.9);
+    border-color: #FF9500;
+    color: #FF9500;
+}
+
+.sound-selector .midi-learn-btn.learning {
+    background: rgba(255, 0, 0, 0.8);
+    color: white;
+    border-color: red;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0% { background: rgba(255, 0, 0, 0.8); }
+    50% { background: rgba(255, 0, 0, 0.4); }
+    100% { background: rgba(255, 0, 0, 0.8); }
+}
+
+.sound-selector .midi-learn-btn {
+    position: relative;
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    background: rgba(30, 30, 30, 0.9);
+    border: 1px solid #666;
+    color: #999;
+    font-size: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.sound-selector .midi-learn-btn.learning {
+    background: rgba(255, 0, 0, 0.8);
+    color: white;
+    animation: pulse 1s infinite;
+}
 
 .slice-controls {
     position: absolute;
@@ -1068,8 +1189,6 @@
     justify-content: center;
 }
 
-
-
 .slice-controls button.copy-btn,
 .slice-controls button.paste-btn {
     font-size: 9px;
@@ -1103,7 +1222,230 @@
     background: rgba(30, 35, 40, 0.9); /* Sfondo più scuro per i controlli su slice reversed */
 }
 
+.sound-option {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px;
+    background: #1E2328;
+    border-radius: 4px;
+    margin-bottom: 4px;
+}
 
+.sound-option .midi-learn-btn {
+    min-width: 40px;
+    height: 20px;
+    padding: 0 6px;
+    background: #272B33;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: 3px;
+    color: #808080;
+    font-size: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
 
+.sound-option .midi-learn-btn.learning {
+    background: rgba(255, 0, 0, 0.8);
+    color: white;
+    animation: pulse 1s infinite;
+}
 
+.sound-triggers {
+    display: flex;
+    gap: 8px;
+    margin: 8px 0;
+    flex-wrap: wrap;
+}
+
+.trigger-slot {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: center;
+    min-width: 40px;
+}
+
+.trigger-btn {
+    width: 40px;
+    height: 40px;
+    background: #1E2328;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: 4px;
+    color: #808080;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.trigger-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.trigger-btn.has-sound {
+    color: #FF9500;
+    border-color: #FF9500;
+}
+
+.trigger-btn.active {
+    background: #FF9500;
+    color: #1E2328;
+}
+
+.trigger-slot .midi-learn-btn {
+    width: 100%;
+    height: 20px;
+    background: #1E2328;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: 4px;
+    color: #808080;
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    opacity: 1;
+    visibility: visible;
+}
+
+.trigger-slot .midi-learn-btn.learning {
+    background: rgba(255, 0, 0, 0.8);
+    color: white;
+    border-color: red;
+    animation: pulse 1s infinite;
+}
+
+.sound-triggers {
+    display: flex;
+    gap: 4px;
+    margin: 8px 0;
+}
+
+.trigger-slot {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    align-items: center;
+}
+
+.trigger-btn {
+    width: 40px;
+    height: 40px;
+    background: #1E2328;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: 4px;
+    color: #808080;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.trigger-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.trigger-btn.has-sound {
+    color: #FF9500;
+    border-color: #FF9500;
+}
+
+.trigger-btn.active {
+    background: #FF9500;
+    color: #1E2328;
+}
+
+.trigger-slot .midi-learn-btn {
+    width: 40px;
+    height: 20px;
+    background: #1E2328;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: 4px;
+    color: #808080;
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: contents;
+}
+
+.trigger-slot .midi-learn-btn.learning {
+    background: rgba(255, 0, 0, 0.8);
+    color: white;
+    border-color: red;
+    animation: pulse 1s infinite;
+}
+
+.trigger-container {
+    display: flex;
+    gap: 8px;
+    margin: 8px 0;
+}
+
+.trigger-slot {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.trigger-group {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.trigger-btn {
+    width: 40px;
+    height: 40px;
+    background: #1E2328;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: 4px;
+    color: #808080;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.trigger-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.trigger-btn.has-sound {
+    color: #FF9500;
+    border-color: #FF9500;
+}
+
+.trigger-btn.active {
+    background: #FF9500;
+    color: #1E2328;
+}
+
+.midi-learn-btn {
+    width: 40px;
+    height: 24px;
+    background: #1E2328;
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: 4px;
+    color: #808080;
+    font-size: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.midi-learn-btn:hover {
+    background: #272B33;
+    color: #FF9500;
+    border-color: #FF9500;
+}
+
+.midi-learn-btn.learning {
+    background: rgba(255, 0, 0, 0.8);
+    color: white;
+    border-color: red;
+    animation: pulse 1s infinite;
+}
 
