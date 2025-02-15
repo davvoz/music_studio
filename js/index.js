@@ -1,11 +1,6 @@
 import { AudioEngine } from './core/AudioEngine.js';
 import { RenderEngine } from './core/RenderEngine.js';
-import { TB303 } from './audio-components/instruments/tb303/TB303.js';
-import { DrumMachine } from './audio-components/instruments/drummer/DrumMachine.js';
-import { Sampler } from './audio-components/instruments/sampler/Sampler.js';
 import { MIDIManager } from './core/MIDIManager.js';
-import { Looper } from './audio-components/instruments/looper/Looper.js';
-import { AIComposer } from './audio-components/instruments/ai-composer/AIComposer.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
     const audioEngine = new AudioEngine();

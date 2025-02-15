@@ -4,6 +4,8 @@ import { VUMeter } from '../../components/VUMeter.js';
 import { DelayEffect } from '../effects/DelayEffect.js';
 import { ShaperEffect } from '../effects/ShaperEffect.js';
 import { MIDIMapping } from '../../core/MIDIMapping.js';  // Aggiungi questa importazione
+import { VirtualSidechain } from '../effects/virtual-sidechain/VirtualSidechain.js';  // Aggiungi questa importazione
+
 
 export class AbstractInstrument extends AbstractAudioComponent {
     constructor(context, id) {
@@ -22,6 +24,7 @@ export class AbstractInstrument extends AbstractAudioComponent {
         // Create effects
         this.delay = new DelayEffect(context);
         this.shaper = new ShaperEffect(context);
+        this.virtualSidechain = new VirtualSidechain(context);
         
         // Set initial values
         this.rackVolume.gain.value = 0.8;
@@ -32,7 +35,8 @@ export class AbstractInstrument extends AbstractAudioComponent {
         // Connect the audio chain with effects
         this.instrumentOutput.connect(this.shaper.input);
         this.shaper.connect(this.delay.input);
-        this.delay.connect(this.rackVolume);
+        this.delay.connect(this.virtualSidechain.input);
+        this.virtualSidechain.connect(this.rackVolume);
         this.rackVolume.connect(this.output);
         
         // Connect VU meter in parallel
@@ -51,6 +55,20 @@ export class AbstractInstrument extends AbstractAudioComponent {
         const mixerSection = document.createElement('div');
         mixerSection.className = 'rack-mixer';
         
+        // Create effects container
+        const effectsContainer = document.createElement('div');
+        effectsContainer.className = 'effects-container';
+
+        // Create a container for volume and VU meter
+        const volumeAndVUContainer = document.createElement('div');
+        volumeAndVUContainer.className = 'volume-vu-container effect-unit';
+
+        // Add volume label
+        const volumeLabel = document.createElement('div');
+        volumeLabel.className = 'effect-label';
+        volumeLabel.textContent = 'Volume';
+        volumeAndVUContainer.appendChild(volumeLabel);
+
         // Volume controls
         const volumeContainer = document.createElement('div');
         volumeContainer.className = 'volume-container';
@@ -103,20 +121,53 @@ export class AbstractInstrument extends AbstractAudioComponent {
 
         volumeContainer.appendChild(volumeSlider);
         volumeContainer.appendChild(midiLearnBtn);
-        mixerSection.appendChild(volumeContainer);
-        mixerSection.appendChild(this.vuMeter.getElement());
+        volumeAndVUContainer.appendChild(volumeContainer);
+        volumeAndVUContainer.appendChild(this.vuMeter.getElement());
+
+        // Add volume-vu-container to effects container
+        effectsContainer.appendChild(volumeAndVUContainer);
+
+        // Add shaper effect with label
+        const shaperContainer = document.createElement('div');
+        shaperContainer.className = 'effect-unit';
+        const shaperLabel = document.createElement('div');
+        shaperLabel.className = 'effect-label';
+        shaperLabel.textContent = 'Shaper';
+        shaperContainer.appendChild(shaperLabel);
+        shaperContainer.appendChild(this.shaper.renderer.render());
+
+        // Add delay effect with label
+        const delayContainer = document.createElement('div');
+        delayContainer.className = 'effect-unit';
+        const delayLabel = document.createElement('div');
+        delayLabel.className = 'effect-label';
+        delayLabel.textContent = 'Delay';
+        delayContainer.appendChild(delayLabel);
+        delayContainer.appendChild(this.delay.renderer.render());
+
+        // Add effects to effects container
+        effectsContainer.appendChild(shaperContainer);
+        effectsContainer.appendChild(delayContainer);
         
-        // Add effects controls
-        const shaperControls = this.shaper.renderer.render();
-        const delayControls = this.delay.renderer.render();
-        mixerSection.appendChild(shaperControls);
-        mixerSection.appendChild(delayControls);
+        mixerSection.appendChild(effectsContainer);
+        
+        // Add sidechain controls with label
+        const sidechainContainer = document.createElement('div');
+        sidechainContainer.className = 'effect-unit';
+        const sidechainLabel = document.createElement('div');
+        sidechainLabel.className = 'effect-label';
+        sidechainLabel.textContent = 'Virtual Sidechain';
+        sidechainContainer.appendChild(sidechainLabel);
+        sidechainContainer.appendChild(this.virtualSidechain.renderer.render());
+        mixerSection.appendChild(sidechainContainer);
         
         container.appendChild(mixerSection);
         return container;
     }
 
     onBeat(beat, time) {
+        // Forward beat to sidechain
+        this.virtualSidechain.onBeat(beat, time);
         // Implementazione specifica dello strumento
     }
 

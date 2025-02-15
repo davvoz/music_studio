@@ -11,9 +11,12 @@
     border: 2px solid var(--accent-color);
     border-radius: 20px;
     padding: 25px;
-    box-shadow: 
-        0 0 30px rgba(0, 255, 157, 0.1),
-        inset 0 0 30px rgba(0, 0, 0, 0.4);
+    position: relative;
+    z-index: 0;
+    min-width: 800px;
+    width: 100%;
+    height: auto;
+    overflow: visible;
 }
 
 .drum-controls, .drum-grid {
@@ -396,4 +399,14 @@
     background: rgba(255, 0, 0, 0.8);
     color: white;
     animation: pulse 1s infinite;
+}
+
+.drum-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 20px;
+    border-radius: 15px;
+    border: 1px solid var(--border-light);
+    background: var(--primary-bg);
 }
