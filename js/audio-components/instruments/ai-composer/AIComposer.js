@@ -20,6 +20,8 @@ export class AIComposer extends AbstractInstrument {
             cutoff: 0.5,
             resonance: 0.3,
             attack: 0.01,
+            decay: 0.1,
+            sustain: 0.7,
             release: 0.3,
             tempo: 120
         };
@@ -117,18 +119,29 @@ export class AIComposer extends AbstractInstrument {
 
     playNote(note, time) {
         const now = time || this.context.currentTime;
-
-        // Calculate frequency from MIDI note
         const freq = 440 * Math.pow(2, (note - 69) / 12);
-
+        
         // Set oscillator frequency
         this.osc.frequency.setValueAtTime(freq, now);
 
-        // Apply envelope
+        // ADSR envelope
         this.envelope.gain.cancelScheduledValues(now);
         this.envelope.gain.setValueAtTime(0, now);
-        this.envelope.gain.linearRampToValueAtTime(0.3, now + this.parameters.attack);
-        this.envelope.gain.linearRampToValueAtTime(0, now + this.parameters.attack + this.parameters.release);
+        
+        // Attack
+        this.envelope.gain.linearRampToValueAtTime(0.8, now + this.parameters.attack);
+        
+        // Decay to sustain level
+        this.envelope.gain.linearRampToValueAtTime(
+            0.8 * this.parameters.sustain, 
+            now + this.parameters.attack + this.parameters.decay
+        );
+        
+        // Release
+        this.envelope.gain.linearRampToValueAtTime(
+            0, 
+            now + this.parameters.attack + this.parameters.decay + this.parameters.release
+        );
     }
 
     onBeat(beat) {
@@ -159,6 +172,7 @@ export class AIComposer extends AbstractInstrument {
             case 'waveform':
                 this.osc.type = value;
                 break;
+            // ADSR parameters are automatically updated in this.parameters
         }
     }
 
