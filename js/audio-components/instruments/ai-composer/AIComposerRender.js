@@ -1,4 +1,5 @@
 import { AbstractHTMLRender } from "../../abstract/AbstractHTMLRender.js";
+import { Knob } from "../../../components/Knob.js"; // Aggiungi l'import del Knob
 
 export class AIComposerRender extends AbstractHTMLRender {
     constructor(instanceId, composerInstance) {
@@ -6,6 +7,7 @@ export class AIComposerRender extends AbstractHTMLRender {
         this.instanceId = instanceId;
         this.composer = composerInstance;
         this.container.classList.add('ai-composer');
+        this.knobs = new Map(); // Aggiungi map per i knob
         this.createInterface();
     }
 
@@ -28,41 +30,52 @@ export class AIComposerRender extends AbstractHTMLRender {
             ])
         );
 
-        // Create ADSR controls
-        const adsrControls = [
-            { name: 'Attack', min: 0, max: 2, step: 0.01, value: 0.01 },
-            { name: 'Decay', min: 0, max: 1, step: 0.01, value: 0.1 },
-            { name: 'Sustain', min: 0, max: 1, step: 0.01, value: 0.7 },
-            { name: 'Release', min: 0, max: 2, step: 0.01, value: 0.3 }
-        ].map(param => this.createControlGroup(param.name, 
-            this.createSlider(`${param.name.toLowerCase()}-slider`, param))
-        );
+        // Create knobs container
+        const knobsContainer = document.createElement('div');
+        knobsContainer.className = 'knobs-container';
 
-        // Create scale control
-        const scaleGroup = this.createControlGroup('Scale',
-            this.createSelect('scale-select', [
+        // Define knobs
+        const knobs = {
+            cutoff: { name: 'CUTOFF', value: this.composer.parameters.cutoff },
+            resonance: { name: 'RES', value: this.composer.parameters.resonance },
+            attack: { name: 'ATT', value: this.composer.parameters.attack },
+            decay: { name: 'DEC', value: this.composer.parameters.decay },
+            sustain: { name: 'SUS', value: this.composer.parameters.sustain },
+            release: { name: 'REL', value: this.composer.parameters.release }
+        };
+
+        // Create and append knobs
+        Object.entries(knobs).forEach(([param, config]) => {
+            const knobWrapper = this.createKnob(param, config.name, config.value);
+            knobsContainer.appendChild(knobWrapper);
+        });
+
+        // Append elements in the correct order
+        controlsSection.appendChild(knobsContainer);
+        controlsSection.appendChild(waveformGroup);
+
+        // Create and append other controls
+        const otherControls = [
+            this.createControlGroup('Scale', this.createSelect('scale-select', [
                 { value: 'minor', text: 'Minor' },
                 { value: 'major', text: 'Major' },
                 { value: 'pentatonic', text: 'Pentatonic' }
-            ])
-        );
+            ])),
+            this.createControlGroup('Root', this.createSelect('root-select', 
+                ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+                .map(note => ({ value: note, text: note }))
+            )),
+            this.createControlGroup('Complexity', this.createSlider('complexity-slider', 
+                { min: 0, max: 1, step: 0.01, value: 0.5 }
+            )),
+            this.createControlGroup('Variation', this.createSlider('variation-slider', 
+                { min: 0, max: 1, step: 0.01, value: 0.3 }
+            ))
+        ];
 
-        // Create root note control
-        const rootGroup = this.createControlGroup('Root',
-            this.createSelect('root-select', [
-                'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'
-            ].map(note => ({ value: note, text: note })))
-        );
+        otherControls.forEach(control => controlsSection.appendChild(control));
 
-        // Create complexity and variation controls
-        const complexityGroup = this.createControlGroup('Complexity',
-            this.createSlider('complexity-slider', { min: 0, max: 1, step: 0.01, value: 0.5 })
-        );
-        const variationGroup = this.createControlGroup('Variation',
-            this.createSlider('variation-slider', { min: 0, max: 1, step: 0.01, value: 0.3 })
-        );
-
-        // Create action buttons
+        // Create and append action buttons
         const actionButtons = document.createElement('div');
         actionButtons.className = 'action-buttons';
         ['Generate', 'Play'].forEach(text => {
@@ -71,21 +84,15 @@ export class AIComposerRender extends AbstractHTMLRender {
             button.textContent = text;
             actionButtons.appendChild(button);
         });
+        controlsSection.appendChild(actionButtons);
 
-        // Append all controls
-        [waveformGroup, ...adsrControls, scaleGroup, rootGroup, 
-         complexityGroup, variationGroup, actionButtons].forEach(el => 
-            controlsSection.appendChild(el)
-        );
-
+        // Append everything to panel and container
         panel.appendChild(controlsSection);
+        this.container.appendChild(panel);
 
-        // Create sequence grid container
+        // Create and append sequence grid
         const sequenceGrid = document.createElement('div');
         sequenceGrid.className = 'sequence-grid';
-
-        // Append everything to container
-        this.container.appendChild(panel);
         this.container.appendChild(sequenceGrid);
 
         this.createSequenceGrid();
@@ -126,6 +133,50 @@ export class AIComposerRender extends AbstractHTMLRender {
         return slider;
     }
 
+    createKnob(param, label, initialValue) {
+        const knobWrapper = document.createElement('div');
+        knobWrapper.className = 'knob-wrap';
+        knobWrapper.setAttribute('data-param', param);
+
+        const knobContainer = document.createElement('div');
+        knobContainer.className = 'knob-container';
+
+        const knobElement = document.createElement('div');
+        knobElement.className = 'knob';
+
+        const labelElement = document.createElement('span');
+        labelElement.textContent = label;
+
+        knobContainer.appendChild(knobElement);
+        knobWrapper.appendChild(knobContainer);
+        knobWrapper.appendChild(labelElement);
+
+        // Configura il knob in base al parametro
+        const config = {
+            min: 0,
+            max: 1,
+            value: initialValue,
+            size: 40,
+            onChange: (v) => {
+                // Invia direttamente al composer invece di usare il callback
+                this.composer.updateParameter(param, v);
+            }
+        };
+
+        // Configurazioni specifiche per parametro
+        switch(param) {
+            case 'attack':
+            case 'release':
+                config.max = 2;
+                break;
+        }
+
+        const knob = new Knob(knobElement, config);
+        this.knobs.set(param, knob);
+
+        return knobWrapper;
+    }
+
     createSequenceGrid() {
         const grid = this.container.querySelector('.sequence-grid');
         for (let i = 0; i < 16; i++) {
@@ -137,6 +188,7 @@ export class AIComposerRender extends AbstractHTMLRender {
     }
 
     setupEventListeners() {
+        // Rimuovi i vecchi listener per gli slider
         // Setup all control listeners
         this.container.querySelector('.waveform-select').addEventListener('change', e => {
             this.composer.updateParameter('waveform', e.target.value);
@@ -154,13 +206,6 @@ export class AIComposerRender extends AbstractHTMLRender {
                 this.composer.start();
                 e.target.textContent = 'Stop';
             }
-        });
-
-        // ADSR listeners
-        ['attack', 'decay', 'sustain', 'release'].forEach(param => {
-            this.container.querySelector(`.${param}-slider`).addEventListener('input', e => {
-                this.composer.updateParameter(param, parseFloat(e.target.value));
-            });
         });
     }
 

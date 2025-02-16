@@ -5,16 +5,7 @@ export class AIComposer extends AbstractInstrument {
     constructor(context) {
         super(context);
         
-        // Base synth setup
-        this.setupSynth();
-        
-        // Sequence setup
-        this.sequence = new Array(16).fill().map(() => ({
-            note: null,
-            active: false
-        }));
-
-        // Musical parameters
+        // Initialize parameters first
         this.parameters = {
             waveform: 'sawtooth',
             cutoff: 0.5,
@@ -25,6 +16,15 @@ export class AIComposer extends AbstractInstrument {
             release: 0.3,
             tempo: 120
         };
+        
+        // Then setup synth which depends on parameters
+        this.setupSynth();
+        
+        // Rest of initialization
+        this.sequence = new Array(16).fill().map(() => ({
+            note: null,
+            active: false
+        }));
 
         // Musical scales
         this.scales = {
@@ -53,11 +53,11 @@ export class AIComposer extends AbstractInstrument {
         this.osc = this.context.createOscillator();
         this.osc.type = 'sawtooth';
 
-        // Filter
+        // Filter setup with better defaults
         this.filter = this.context.createBiquadFilter();
         this.filter.type = 'lowpass';
-        this.filter.frequency.value = 2000;
-        this.filter.Q.value = 5;
+        this.filter.frequency.value = this.calculateFilterFrequency(this.parameters.cutoff);
+        this.filter.Q.value = this.parameters.resonance * 30;
 
         // Envelope
         this.envelope = this.context.createGain();
@@ -69,6 +69,11 @@ export class AIComposer extends AbstractInstrument {
         this.envelope.connect(this.instrumentOutput);
 
         this.osc.start();
+    }
+
+    calculateFilterFrequency(cutoff) {
+        // Logarithmic scale from 20Hz to 20000Hz
+        return Math.exp(cutoff * Math.log(20000)) + 20;
     }
 
     generatePattern() {
@@ -163,11 +168,11 @@ export class AIComposer extends AbstractInstrument {
 
         switch(param) {
             case 'cutoff':
-                const freq = Math.exp(value * Math.log(20000));
-                this.filter.frequency.setValueAtTime(freq, this.context.currentTime);
+                const freq = this.calculateFilterFrequency(value);
+                this.filter.frequency.setTargetAtTime(freq, this.context.currentTime, 0.01);
                 break;
             case 'resonance':
-                this.filter.Q.value = value * 30;
+                this.filter.Q.setTargetAtTime(value * 30, this.context.currentTime, 0.01);
                 break;
             case 'waveform':
                 this.osc.type = value;

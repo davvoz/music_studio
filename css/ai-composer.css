@@ -73,7 +73,6 @@
 
 /* Controls styling */
 .controls-section {
-    width: 300px; /* Larghezza fissa per i controlli */
     flex-shrink: 0; /* Impedisce il restringimento */
     background: #1E2328;
     padding: 15px;
@@ -133,3 +132,24 @@
 }
 
 
+.ai-composer .knob-wrap span {
+    font-size: 10px;
+    color: #999;
+    text-transform: uppercase;
+}
+
+.ai-composer .knob-wrap .knob-indicator {
+    position: absolute;
+    width: 2px;
+    height: 16px;
+    background: #FF9500;
+    left: 50%;
+    top: 4px;
+    transform-origin: bottom center;
+}
+
+.knobs-container {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+}
