@@ -36,6 +36,7 @@ export class AIComposerRender extends AbstractHTMLRender {
 
         // Define knobs
         const knobs = {
+            volume: { name: 'VOL', value: this.composer.parameters.volume },
             cutoff: { name: 'CUTOFF', value: this.composer.parameters.cutoff },
             resonance: { name: 'RES', value: this.composer.parameters.resonance },
             attack: { name: 'ATT', value: this.composer.parameters.attack },
@@ -74,6 +75,38 @@ export class AIComposerRender extends AbstractHTMLRender {
         ];
 
         otherControls.forEach(control => controlsSection.appendChild(control));
+
+        // Prima creiamo i pattern controls
+        const patternControls = document.createElement('div');
+        patternControls.className = 'pattern-controls';
+        patternControls.innerHTML = `
+            <div class="pattern-mode">
+                <button class="pattern-a-btn active">A</button>
+                <button class="pattern-chain-btn">A+B</button>
+                <button class="pattern-b-btn">B</button>
+                <button class="copy-to-b-btn">A→B</button>
+            </div>
+        `;
+
+        // Poi creiamo i bar controls
+        const barControls = document.createElement('div');
+        barControls.className = 'bar-controls';
+        barControls.innerHTML = `
+            <div class="bar-settings">
+                <label>Switch Every
+                    <select class="switch-bars">
+                        <option value="1">1 bar</option>
+                        <option value="2">2 bars</option>
+                        <option value="4" selected>4 bars</option>
+                        <option value="8">8 bars</option>
+                    </select>
+                </label>
+            </div>
+        `;
+
+        // Ora possiamo inserirli nell'ordine corretto
+        controlsSection.appendChild(barControls);
+        controlsSection.appendChild(patternControls);
 
         // Create and append action buttons
         const actionButtons = document.createElement('div');
@@ -179,9 +212,11 @@ export class AIComposerRender extends AbstractHTMLRender {
 
     createSequenceGrid() {
         const grid = this.container.querySelector('.sequence-grid');
-        for (let i = 0; i < 16; i++) {
+        // Crea 32 step invece di 16
+        for (let i = 0; i < 32; i++) {
             const step = document.createElement('div');
             step.className = 'step';
+            if (i >= 16) step.classList.add('hidden'); // Nascondi di default
             step.innerHTML = '<span class="note-display">-</span>';
             grid.appendChild(step);
         }
@@ -206,6 +241,28 @@ export class AIComposerRender extends AbstractHTMLRender {
                 this.composer.start();
                 e.target.textContent = 'Stop';
             }
+        });
+
+        // Aggiungi listener per i controlli pattern
+        this.container.querySelector('.pattern-chain-btn').addEventListener('click', (e) => {
+            const isChained = e.target.classList.toggle('active');
+            this.composer.togglePatternChain(isChained);
+            
+            // Aggiorna visibilità degli step
+            const steps = this.container.querySelectorAll('.step');
+            steps.forEach((step, i) => {
+                step.classList.toggle('hidden', !isChained && i >= 16);
+            });
+        });
+
+        this.container.querySelector('.copy-to-b-btn').addEventListener('click', () => {
+            this.composer.copyPatternToB();
+        });
+
+        // Aggiungi listener per il controllo delle battute
+        this.container.querySelector('.switch-bars').addEventListener('change', (e) => {
+            const bars = parseInt(e.target.value);
+            this.composer.setPatternSwitch(bars);
         });
     }
 
@@ -259,5 +316,21 @@ export class AIComposerRender extends AbstractHTMLRender {
         const octave = Math.floor(midiNote / 12) - 1;
         const note = notes[midiNote % 12];
         return `${note}${octave}`;
+    }
+
+    updatePatternMode(mode) {
+        const steps = this.container.querySelectorAll('.step');
+        steps.forEach((step, i) => {
+            step.classList.toggle('hidden', !mode.chain && i >= 16);
+        });
+    }
+
+    updateActivePattern(pattern) {
+        // Aggiorna visualmente quale pattern è attivo
+        const buttons = this.container.querySelectorAll('.pattern-mode button');
+        buttons.forEach(btn => btn.classList.remove('current'));
+        
+        const selector = pattern === 'B' ? '.pattern-b-btn' : '.pattern-a-btn';
+        this.container.querySelector(selector)?.classList.add('current');
     }
 }
