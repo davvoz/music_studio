@@ -10,6 +10,21 @@ export class DrumMachine extends AbstractInstrument {
         this.instanceId = 'drum_' + Date.now();
         this.midiMapping = new MIDIMapping();
 
+        // Inizializza la sequence
+        this.sequence = {
+            kick:  Array(128).fill().map(() => ({ active: false, velocity: 1 })),
+            snare: Array(128).fill().map(() => ({ active: false, velocity: 1 })),
+            hihat: Array(128).fill().map(() => ({ active: false, velocity: 1 })),
+            clap:  Array(128).fill().map(() => ({ active: false, velocity: 1 }))
+        };
+
+        // Stati di navigazione e pattern
+        this.currentBar = 0;      // Bar corrente
+        this.playingBar = 0;      // Bar che sta suonando
+        this.numBars = 4;         // Default a 4 bars
+        this.selectedLength = 128; // 4 bars * 32 steps
+        this.isEditMode = true;   // Modalità default è edit
+
         // Ora crea il renderer passando sia l'ID che l'istanza
         this.renderer = new DrumMachineRender(this.instanceId, this);
 
@@ -18,13 +33,6 @@ export class DrumMachine extends AbstractInstrument {
             snare: { buffer: null },
             hihat: { buffer: null },
             clap: { buffer: null }
-        };
-
-        this.sequence = {
-            kick:  Array(32).fill({ active: false, velocity: 1 }),
-            snare: Array(32).fill({ active: false, velocity: 1 }),
-            hihat: Array(32).fill({ active: false, velocity: 1 }),
-            clap:  Array(32).fill({ active: false, velocity: 1 })
         };
 
         this.parameters = {
@@ -45,10 +53,27 @@ export class DrumMachine extends AbstractInstrument {
             this.loadSavedPattern(lastUsedPattern);
         }
 
-        this.selectedLength = 32; // Aggiungi questa linea
+        this.selectedLength = 32; // Default a 1 bar (32 steps)
+        this.totalBars = 1;      // Default a 1 bar
+        this.currentSection = 0;   // Sezione corrente (0-3)
+        this.beatCounter = 0;      // Contatore interno dei beat
 
         // Inizializza MIDI mapping con supporto al salvataggio
         this.midiMapping = new MIDIMapping();
+
+        this.isEditMode = true;    // Modalità default è edit
+        this.editingBar = 0;       // Bar che stiamo editando
+        this.playingBar = 0;       // Bar che sta suonando
+
+        this.currentBar = 0;     // Bar corrente (sia per edit che play)
+        this.numBars = 1;        // Numero di battute (1-4)
+        this.isEditMode = true;  // Modalità default è edit
+
+        // Gestione pattern e navigazione
+        this.currentBar = 0;     // Bar corrente
+        this.numBars = 4;        // Default a 4 bars
+        this.isEditMode = true;  // Modalità default è edit
+        this.selectedLength = 128; // 4 bars * 32 steps
     }
 
     setupAudio() {
@@ -85,8 +110,13 @@ export class DrumMachine extends AbstractInstrument {
                 }
 
                 if (param === 'patternLength') {
-                    this.selectedLength = parseInt(value);
-                    this.renderer.updatePatternLength?.(value);
+                    const steps = parseInt(value);
+                    this.selectedLength = steps;
+                    this.numBars = steps / 32; // Aggiorna il numero di battute
+                    this.currentBar = 0;       // Reset alla prima battuta
+                    this.playingBar = 0;       // Reset del playback
+                    this.clearPattern();
+                    this.renderer.updateView(0, this.numBars);
                 }
             } catch (error) {
                 console.warn('Parameter change error:', error);
@@ -182,23 +212,40 @@ export class DrumMachine extends AbstractInstrument {
         }
     }
 
-    onBeat(beat, time) {
-        // Calcola correttamente l'indice dello step considerando la suddivisione in due parti
-        const stepIndex = beat % 32;
-        if (stepIndex >= this.selectedLength) return;
-        
+    // Modifica il metodo onBeat per usare il contatore interno
+    onBeat(tick, time) {
+        if (tick === 0) {
+            // In play mode, avanziamo alla prossima bar
+            this.playingBar = (this.playingBar + 1) % this.numBars;
+            
+            // In play mode, la vista segue il playback
+            if (!this.isEditMode) {
+                this.currentBar = this.playingBar;
+                this.renderer.updateView(this.currentBar, this.numBars);
+            }
+        }
+
+        // Calcola gli step globali e locali
+        const playingStep = (this.playingBar * 32) + tick;  // Step effettivo per il playback
+        const localStep = tick;  // Step locale per l'highlighting
+
+        // Non suonare se siamo oltre la lunghezza del pattern
+        if (playingStep >= this.selectedLength) {
+            this.playingBar = 0;
+            return;
+        }
+
         const safeTime = Math.max(this.context.currentTime, time);
-        
+
+        // Highlight dello step corrente
         requestAnimationFrame(() => {
-            this.renderer.highlightStep?.(stepIndex);
+            this.renderer.highlightStep(localStep, this.playingBar);
         });
 
+        // Riproduci i suoni usando lo step di playback
         for (const [drum, sequence] of Object.entries(this.sequence)) {
-            const step = sequence[stepIndex];
-            if (step?.active && this.drums[drum]?.buffer) {
-                // Normalizza il volume per evitare differenze tra le due metà
-                const normalizedVelocity = Math.min(step.velocity, 1.5);
-                // Applica il volume corretto considerando sia il volume del drum che la velocity dello step
+            if (sequence[playingStep]?.active && this.drums[drum]?.buffer) {
+                const normalizedVelocity = Math.min(sequence[playingStep].velocity, 1.5);
                 const finalVolume = normalizedVelocity * this.parameters[`${drum}Volume`];
                 this.playSample(drum, safeTime, finalVolume);
             }
@@ -238,21 +285,24 @@ export class DrumMachine extends AbstractInstrument {
     }
 
     loadSavedPattern(slot) {
-        const savedPattern = localStorage.getItem(`${this.instanceId}-pattern-${slot}`);
-        if (!savedPattern) {
-            console.log('No pattern found in slot:', slot);
-                // Resetta il pattern corrente se non ne viene trovato uno salvato
-            this.clearPattern();
-            return;
-        }
-
         try {
-            const pattern = JSON.parse(savedPattern);
-            // Reset della sequenza prima di caricare il nuovo pattern
+            const savedData = localStorage.getItem(`${this.instanceId}-pattern-${slot}`);
+            if (!savedData) {
+                console.log('No pattern found in slot:', slot);
+                return false;
+            }
+
+            const patternData = JSON.parse(savedData);
+            
+            // Ripristina i metadati del pattern
+            this.numBars = patternData.numBars || 4;
+            this.selectedLength = patternData.selectedLength || (this.numBars * 32);
+            
+            // Reset della sequenza
             this.clearPattern();
             
-            // Carica il nuovo pattern
-            Object.entries(pattern).forEach(([drum, steps]) => {
+            // Carica il pattern
+            Object.entries(patternData.sequence || {}).forEach(([drum, steps]) => {
                 if (this.sequence[drum]) {
                     this.sequence[drum] = steps.map(value => ({
                         active: value > 0,
@@ -262,25 +312,22 @@ export class DrumMachine extends AbstractInstrument {
             });
 
             // Aggiorna l'interfaccia
-            requestAnimationFrame(() => {
-                this.renderer.updateSequenceDisplay(this.sequence);
-            });
-            
-            localStorage.setItem(`${this.instanceId}-last-pattern`, slot);
-            console.log('Pattern loaded from slot:', slot);
+            this.renderer.updateView(0, this.numBars);
+            return true;
         } catch (error) {
             console.error('Error loading pattern:', error);
-            // In caso di errore, pulisci il pattern
-            this.clearPattern();
+            return false;
         }
     }
 
+    // Reset delle sequenze con la lunghezza corretta
     clearPattern() {
-        // Resetta tutte le sequenze
         Object.keys(this.sequence).forEach(drum => {
-            this.sequence[drum] = Array(32).fill({ active: false, velocity: 1 });
+            this.sequence[drum] = Array(this.selectedLength)
+                .fill()
+                .map(() => ({ active: false, velocity: 1 }));
         });
-        // Aggiorna l'interfaccia
+        
         requestAnimationFrame(() => {
             this.renderer.updateSequenceDisplay(this.sequence);
         });
@@ -288,20 +335,22 @@ export class DrumMachine extends AbstractInstrument {
 
     saveCurrentPattern(slot) {
         try {
-            // Crea una copia profonda del pattern corrente
-            const pattern = {};
+            const patternData = {
+                numBars: this.numBars,
+                selectedLength: this.selectedLength,
+                sequence: {}
+            };
+
+            // Salva il pattern con i suoi metadati
             Object.entries(this.sequence).forEach(([drum, steps]) => {
-                pattern[drum] = steps.map(step => 
+                patternData.sequence[drum] = steps.map(step => 
                     step.active ? (step.velocity > 1 ? 2 : 1) : 0
                 );
             });
 
-            // Salva il pattern
-            const patternString = JSON.stringify(pattern);
-            localStorage.setItem(`${this.instanceId}-pattern-${slot}`, patternString);
+            localStorage.setItem(`${this.instanceId}-pattern-${slot}`, JSON.stringify(patternData));
             localStorage.setItem(`${this.instanceId}-last-pattern`, slot);
             
-            console.log('Pattern saved to slot:', slot);
             return true;
         } catch (error) {
             console.error('Error saving pattern:', error);
@@ -362,6 +411,27 @@ export class DrumMachine extends AbstractInstrument {
                     console.log('Drum pattern loaded:', patternNum);
                 }
             }
+        }
+    }
+
+    setEditMode(enabled) {
+        this.isEditMode = enabled;
+        this.renderer.setEditMode(enabled);
+    }
+
+    setNumBars(bars) {
+        this.numBars = Math.max(1, Math.min(4, bars));
+        this.selectedLength = this.numBars * 32;
+        this.currentBar = Math.min(this.currentBar, this.numBars - 1);
+        this.clearPattern();
+        // Aggiorna la vista
+        this.renderer.updateView(this.currentBar, this.numBars);
+    }
+
+    navigateToBar(barNumber) {
+        if (barNumber >= 0 && barNumber < this.numBars) {
+            this.currentBar = barNumber;
+            this.renderer.updateView(this.currentBar, this.numBars);
         }
     }
 }

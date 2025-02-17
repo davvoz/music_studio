@@ -7,7 +7,7 @@
 }
 
 .drum-machine {
-    background: linear-gradient(45deg, var(--primary-bg), var(--secondary-bg));
+    background: linear-gradient(45deg, var(--primary-bg), var (--secondary-bg));
     border: 2px solid var(--accent-color);
     border-radius: 20px;
     padding: 25px;
@@ -30,11 +30,17 @@
 }
 
 .drum-grid {
-    max-width: 100%;
-    overflow-x: auto;
     padding: 20px;
-    /* Assicuriamoci che la griglia sia abbastanza larga per 32 step */
-    min-width: fit-content;
+    background: var(--primary-bg);
+    border-radius: 15px;
+    border: 1px solid var(--border-light);
+}
+
+.drum-grid-content {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    transition: transform 0.3s ease;
 }
 
 .drum-knobs {
@@ -77,8 +83,6 @@
     margin-top: 10px;
 }
 
-
-
 .effect-group {
     display: flex;
     gap: 10px;
@@ -105,34 +109,32 @@
 
 .drum-row {
     display: flex;
-    gap: 4px;
+    height: 40px;
+    align-items: center;
     margin-bottom: 6px;
-    padding-bottom: 6px;
-    /* Assicuriamoci che la riga sia abbastanza larga per 32 step */
-    min-width: max-content;
 }
 
 .drum-cell {
     width: 30px;
     height: 30px;
-    min-width: 30px;
+    margin-right: 4px;
     background: var(--secondary-bg);
     border: 1px solid rgba(0, 255, 157, 0.2);
     border-radius: 8px;
-    box-shadow:
-        inset 0 1px 2px rgba(0, 0, 0, 0.2),
-        0 1px 1px rgba(255, 255, 255, 0.02);
     cursor: pointer;
 }
 
 .drum-cell.active {
     background: var(--accent-color);
     box-shadow: 0 0 15px rgba(0, 255, 157, 0.3);
+    z-index: 2;
 }
 
 .drum-cell.playing {
     border-color: var(--highlight-color);
-    box-shadow: 0 0 15px rgba(255, 149, 0, 0.2);
+    box-shadow: 0 0 5px var(--highlight-color);
+    transform: scale(1.05);
+    z-index: 2;
 }
 
 .drum-cell.accent {
@@ -157,8 +159,8 @@
 }
 
 .drum-cell.bar-start {
-    border-left: 2px solid rgba(255, 149, 0, 0.5);
     margin-left: 8px;
+    border-left: 2px solid var(--highlight-color);
 }
 
 .drum-cell.half-bar {
@@ -202,7 +204,7 @@
     content: '+ Load Sample';
     padding: 6px 12px;
     background: var(--primary-bg);
-    color: var(--highlight-color);
+    color: var (--highlight-color);
     border-radius: 4px;
     font-size: 11px;
     cursor: pointer;
@@ -212,7 +214,7 @@
 
 .sample-loader:hover::after {
     background: var(--highlight-color);
-    color: var(--primary-bg);
+    color: var (--primary-bg);
 }
 
 .sample-status {
@@ -311,13 +313,35 @@
 
 .memory-btn.saved {
     background: var(--highlight-color);
-    color: var(--primary-bg);
+    color: var (--primary-bg);
+}
+
+.memory-btn.loading {
+    border-color: var(--accent-color);
+    animation: loadingPulse 0.5s infinite;
+}
+
+.memory-btn.error {
+    border-color: #ff3366;
+    animation: errorShake 0.3s;
 }
 
 @keyframes savingPulse {
     0% { transform: scale(1); background: #1E2328; }
     50% { transform: scale(1.1); background: #272B33; }
     100% { transform: scale(1); background: #1E2328; }
+}
+
+@keyframes loadingPulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+@keyframes errorShake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-2px); }
+    75% { transform: translateX(2px); }
 }
 
 .drummachineknob {
@@ -409,4 +433,104 @@
     border-radius: 15px;
     border: 1px solid var(--border-light);
     background: var(--primary-bg);
+}
+
+.pattern-navigation {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    background: var(--primary-bg);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    margin-bottom: 15px;
+}
+
+.nav-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.nav-btn {
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--primary-bg);
+    border: 1px solid var(--accent-color);
+    color: var(--accent-color);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 12px;
+}
+
+.nav-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    border-color: var(--border-light);
+    color: var(--border-light);
+}
+
+.nav-btn:hover:not(:disabled) {
+    background: var(--accent-color);
+    color: var(--primary-bg);
+}
+
+.section-display {
+    font-size: 12px;
+    color: var(--accent-color);
+    min-width: 40px;
+    text-align: center;
+    font-weight: bold;
+}
+
+.pattern-length-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.pattern-length-control span {
+    color: var(--accent-color);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.pattern-length-select {
+    background: var(--primary-bg);
+    border: 1px solid var(--accent-color);
+    color: var(--accent-color);
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.pattern-length-select:hover {
+    border-color: var(--highlight-color);
+    color: var(--highlight-color);
+}
+
+.pattern-length-select option {
+    background: var(--primary-bg);
+    color: var(--accent-color);
+}
+
+.edit-mode-btn {
+    padding: 4px 12px;
+    background: var(--primary-bg);
+    border: 1px solid var(--accent-color);
+    color: var(--accent-color);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s ease;
+}
+
+.edit-mode-btn.active {
+    background: var(--accent-color);
+    color: var(--primary-bg);
 }

@@ -19,69 +19,240 @@ export class DrumMachineRender extends AbstractHTMLRender {
         this.sequenceChangeCallback = null;
         this.isSaveMode = false;
         this.isSaving = false;  // Nuovo flag per evitare salvataggi multipli
+        this.currentSection = 0;
+        this.patternLength = 128;
         this.createInterface();
         this.setupEventListeners();
     }
 
     createInterface() {
-        this.container.innerHTML = `
-        <div class="drum-container">
-            <div class="drum-controls">
-                <div class="drum-samples">
-                    <div class="sample-loader" data-drum="kick">
-                        <span>KICK</span>
-                        <input type="file" accept="audio/*" data-drum="kick">
-                        <div class="sample-status">No sample loaded</div>
-                    </div>
-                    <div class="sample-loader" data-drum="snare">
-                        <span>SNARE</span>
-                        <input type="file" accept="audio/*" data-drum="snare">
-                        <div class="sample-status">No sample loaded</div>
-                    </div>
-                    <div class="sample-loader" data-drum="hihat">
-                        <span>HIHAT</span>
-                        <input type="file" accept="audio/*" data-drum="hihat">
-                        <div class="sample-status">No sample loaded</div>
-                    </div>
-                    <div class="sample-loader" data-drum="clap">
-                        <span>CLAP</span>
-                        <input type="file" accept="audio/*" data-drum="clap">
-                        <div class="sample-status">No sample loaded</div>
-                    </div>
-                </div>
-                <div class="drum-knobs"></div>
-                <div class="pattern-selectore">
-                    <div class="pattern-memory">
-                        <div class="memory-slot" data-slot="1">
-                            <button class="memory-btn" data-slot="1">1</button>
-                            <button class="midi-learn-btn" data-param="pattern1"><span>MIDI</span></button>
-                        </div>
-                        <div class="memory-slot" data-slot="2">
-                            <button class="memory-btn" data-slot="2">2</button>
-                            <button class="midi-learn-btn" data-param="pattern2"><span>MIDI</span></button>
-                        </div>
-                        <div class="memory-slot" data-slot="3">
-                            <button class="memory-btn" data-slot="3">3</button>
-                            <button class="midi-learn-btn" data-param="pattern3"><span>MIDI</span></button>
-                        </div>
-                        <div class="memory-slot" data-slot="4">
-                            <button class="memory-btn" data-slot="4">4</button>
-                            <button class="midi-learn-btn" data-param="pattern4"><span>MIDI</span></button>
-                        </div>
-                    </div>
-                    <div class="pattern-actionse">
-                        <button class="save-btn">SAVE</button>
-                    </div>
-                </div>
-            </div>
-            <div class="drum-grid"></div>
-            </div>
-        `;
+        const drumContainer = this.createDrumContainer();
+        const drumControls = this.createDrumControls();
+        const navigation = this.createNavigation();
+        const drumGrid = this.createDrumGrid();
 
+        drumContainer.append(drumControls, navigation, drumGrid);
+        this.container.appendChild(drumContainer);
+
+        this.initializeComponents();
+    }
+
+    createDrumContainer() {
+        const container = document.createElement('div');
+        container.className = 'drum-container';
+        return container;
+    }
+
+    createDrumControls() {
+        const controls = document.createElement('div');
+        controls.className = 'drum-controls';
+
+        const samples = this.createSamplesSection();
+        const knobs = this.createKnobsContainer();
+        const patternSelector = this.createPatternSelector();
+
+        controls.append(samples, knobs, patternSelector);
+        return controls;
+    }
+
+    createSamplesSection() {
+        const samples = document.createElement('div');
+        samples.className = 'drum-samples';
+        
+        ['kick', 'snare', 'hihat', 'clap'].forEach(drum => {
+            samples.appendChild(this.createSampleLoader(drum));
+        });
+
+        return samples;
+    }
+
+    createSampleLoader(drum) {
+        const loader = document.createElement('div');
+        loader.className = 'sample-loader';
+        loader.dataset.drum = drum;
+
+        const span = document.createElement('span');
+        span.textContent = drum.toUpperCase();
+
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'audio/*';
+        input.dataset.drum = drum;
+
+        const status = document.createElement('div');
+        status.className = 'sample-status';
+        status.textContent = 'No sample loaded';
+
+        loader.append(span, input, status);
+        return loader;
+    }
+
+    createKnobsContainer() {
+        const knobs = document.createElement('div');
+        knobs.className = 'drum-knobs';
+        return knobs;
+    }
+
+    createPatternSelector() {
+        const selector = document.createElement('div');
+        selector.className = 'pattern-selectore';
+
+        const memory = this.createPatternMemory();
+        const actions = this.createPatternActions();
+
+        selector.append(memory, actions);
+        return selector;
+    }
+
+    createPatternMemory() {
+        const memory = document.createElement('div');
+        memory.className = 'pattern-memory';
+
+        for (let i = 1; i <= 4; i++) {
+            memory.appendChild(this.createMemorySlot(i));
+        }
+
+        return memory;
+    }
+
+    createMemorySlot(index) {
+        const slot = document.createElement('div');
+        slot.className = 'memory-slot';
+        slot.dataset.slot = index.toString();
+
+        const memoryBtn = document.createElement('button');
+        memoryBtn.className = 'memory-btn';
+        memoryBtn.dataset.slot = index.toString();
+        memoryBtn.textContent = index.toString();
+
+        const midiLearnBtn = this.createMidiLearnButton(index);
+
+        slot.append(memoryBtn, midiLearnBtn);
+        return slot;
+    }
+
+    createMidiLearnButton(index) {
+        const btn = document.createElement('button');
+        btn.className = 'midi-learn-btn';
+        btn.dataset.param = `pattern${index}`;
+        
+        const span = document.createElement('span');
+        span.textContent = 'MIDI';
+        btn.appendChild(span);
+        
+        return btn;
+    }
+
+    createPatternActions() {
+        const actions = document.createElement('div');
+        actions.className = 'pattern-actionse';
+
+        const saveBtn = document.createElement('button');
+        saveBtn.className = 'save-btn';
+        saveBtn.textContent = 'SAVE';
+        
+        actions.appendChild(saveBtn);
+        return actions;
+    }
+
+    createNavigation() {
+        const nav = this.createBaseNavigation();
+        const [navControls, lengthControl] = this.createNavigationComponents();
+        nav.append(navControls, lengthControl);
+        return nav;
+    }
+
+    createBaseNavigation() {
+        const nav = document.createElement('div');
+        nav.className = 'pattern-navigation';
+        return nav;
+    }
+
+    createNavigationComponents() {
+        const navControls = this.createNavControls();
+        const lengthControl = this.createLengthControl();
+        return [navControls, lengthControl];
+    }
+
+    createNavControls() {
+        const navControls = document.createElement('div');
+        navControls.className = 'nav-controls';
+
+        const prevBtn = this.createNavigationButton('prev-section', '◀', true);
+        const sectionDisplay = this.createSectionDisplay();
+        const nextBtn = this.createNavigationButton('next-section', '▶', false);
+
+        navControls.append(prevBtn, sectionDisplay, nextBtn);
+        return navControls;
+    }
+
+    createNavigationButton(className, text, isDisabled) {
+        const button = document.createElement('button');
+        button.className = `nav-btn ${className}`;
+        button.textContent = text;
+        button.disabled = isDisabled;
+        return button;
+    }
+
+    createSectionDisplay() {
+        const sectionDisplay = document.createElement('span');
+        sectionDisplay.className = 'section-display';
+        sectionDisplay.textContent = '1/4';
+        return sectionDisplay;
+    }
+
+    createLengthControl() {
+        const lengthControl = document.createElement('div');
+        lengthControl.className = 'pattern-length-control';
+
+        const lengthLabel = document.createElement('span');
+        lengthLabel.textContent = 'LENGTH';
+
+        const lengthSelect = this.createLengthSelect();
+
+        lengthControl.append(lengthLabel, lengthSelect);
+        return lengthControl;
+    }
+
+    createLengthSelect() {
+        const select = document.createElement('select');
+        select.className = 'pattern-length-select';
+
+        const lengths = [
+            { value: '32', text: '1 BAR' },
+            { value: '64', text: '2 BARS' },
+            { value: '96', text: '3 BARS' },
+            { value: '128', text: '4 BARS' }
+        ];
+
+        lengths.forEach(({ value, text }) => {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = text;
+            option.selected = value === '128';
+            select.appendChild(option);
+        });
+
+        // Aggiungi l'event listener per il cambio di lunghezza
+        select.addEventListener('change', (e) => {
+            this.paramChangeCallback?.('patternLength', e.target.value);
+        });
+
+        return select;
+    }
+
+    createDrumGrid() {
+        const grid = document.createElement('div');
+        grid.className = 'drum-grid';
+        return grid;
+    }
+
+    initializeComponents() {
         this.createKnobs();
         this.createSequencer();
         this.setupSampleLoaders();
         this.addCopyPasteControls(this.container.querySelector('.drum-grid'));
+        this.setupNavigationControls();
     }
 
     createKnobs() {
@@ -142,47 +313,32 @@ export class DrumMachineRender extends AbstractHTMLRender {
 
     createSequencer() {
         const grid = this.container.querySelector('.drum-grid');
+        grid.innerHTML = '';
+        
         const drums = ['kick', 'snare', 'hihat', 'clap'];
-        const stepsPerBar = 8; // 8 step per battuta
-        const totalSteps = 32; // 4 battute da 8 step
+        const STEPS = 32;
+        const STEPS_PER_BAR = 8;
 
         drums.forEach(drum => {
             const row = document.createElement('div');
             row.className = 'drum-row';
             row.dataset.drum = drum;
 
-            for (let step = 0; step < totalSteps; step++) {
+            for (let step = 0; step < STEPS; step++) {
                 const cell = document.createElement('div');
                 cell.className = 'drum-cell';
                 cell.dataset.step = step;
                 
-                // Aggiungiamo una classe per marcare l'inizio di ogni battuta
-                if (step % stepsPerBar === 0) {
+                // Marcatori per inizio battuta e metà battuta
+                if (step % STEPS_PER_BAR === 0) {
                     cell.classList.add('bar-start');
-                }
-                // Aggiungiamo una classe per marcare la metà di ogni battuta
-                if (step % (stepsPerBar/2) === 0) {
+                } else if (step % (STEPS_PER_BAR/2) === 0) {
                     cell.classList.add('half-bar');
                 }
 
-                cell.addEventListener('click', () => {
-                    if (cell.classList.contains('active')) {
-                        if (cell.classList.contains('accent')) {
-                            cell.classList.remove('active', 'accent');
-                            this.sequenceChangeCallback?.(drum, step, false, 0);
-                        } else {
-                            cell.classList.add('accent');
-                            this.sequenceChangeCallback?.(drum, step, true, 1.5);
-                        }
-                    } else {
-                        cell.classList.add('active');
-                        this.sequenceChangeCallback?.(drum, step, true, 1);
-                    }
-                });
-
+                cell.addEventListener('click', () => this.handleCellClick(cell));
                 row.appendChild(cell);
             }
-
             grid.appendChild(row);
         });
     }
@@ -293,7 +449,7 @@ export class DrumMachineRender extends AbstractHTMLRender {
 
     handleCellClick(cell) {
         const drum = cell.parentElement.dataset.drum;
-        const step = parseInt(cell.dataset.step);
+        const step = parseInt(cell.dataset.step);  // Ora contiene lo step globale
 
         if (!cell.classList.contains('active')) {
             cell.classList.add('active');
@@ -328,33 +484,65 @@ export class DrumMachineRender extends AbstractHTMLRender {
         if (this.isSaving) return;  // Prevent multiple saves
         
         this.isSaving = true;
-        
         const slot = btn.dataset.slot;
-        this.savePattern(slot);  // Chiamiamo direttamente savePattern invece di usare il callback
-        this.isSaveMode = false;
         
-        this.container.querySelectorAll('.memory-btn').forEach(b => b.classList.remove('saving'));
-        btn.classList.add('saved');
+        // Feedback visivo immediato
+        btn.classList.add('saving');
         
-        setTimeout(() => {
-            btn.classList.remove('saved');
-            this.isSaving = false;  // Reset isSaving dopo il timeout
-        }, 300);
+        // Salva il pattern
+        if (this.drumMachine.saveCurrentPattern(slot)) {
+            // Feedback di successo
+            btn.classList.remove('saving');
+            btn.classList.add('saved');
+            
+            // Reset dello stato
+            setTimeout(() => {
+                btn.classList.remove('saved');
+                this.isSaveMode = false;
+                this.isSaving = false;
+                this.container.querySelectorAll('.memory-btn').forEach(b => {
+                    b.classList.remove('saving');
+                });
+            }, 300);
+        } else {
+            // Feedback di errore
+            btn.classList.remove('saving');
+            btn.classList.add('error');
+            setTimeout(() => {
+                btn.classList.remove('error');
+                this.isSaving = false;
+            }, 300);
+        }
     }
 
     handleLoadMode(btn) {
         const slot = btn.dataset.slot;
         
-        // Rimuovi la classe active da tutti i pulsanti prima
-        this.container.querySelectorAll('.memory-btn').forEach(b => 
-            b.classList.remove('active')
-        );
+        // Feedback visivo immediato
+        btn.classList.add('loading');
         
-        // Aggiungi la classe active solo al pulsante selezionato
-        btn.classList.add('active');
+        // Rimuovi la selezione precedente
+        this.container.querySelectorAll('.memory-btn').forEach(b => {
+            b.classList.remove('active', 'loading');
+        });
         
-        // Carica direttamente il pattern
-        this.loadPattern(slot);
+        // Carica il pattern
+        if (this.drumMachine.loadSavedPattern(slot)) {
+            // Feedback di successo
+            btn.classList.remove('loading');
+            btn.classList.add('active');
+            
+            // Aggiorna il selettore di lunghezza
+            const lengthSelect = this.container.querySelector('.pattern-length-select');
+            if (lengthSelect) {
+                lengthSelect.value = this.drumMachine.selectedLength.toString();
+            }
+        } else {
+            // Feedback di errore
+            btn.classList.remove('loading');
+            btn.classList.add('error');
+            setTimeout(() => btn.classList.remove('error'), 300);
+        }
     }
 
     applyPattern(pattern) {
@@ -419,16 +607,19 @@ export class DrumMachineRender extends AbstractHTMLRender {
         });
     }
 
-    highlightStep(step) {
-        // Remove previous highlight
-        this.container.querySelectorAll('.drum-cell').forEach(cell => {
-            cell.classList.remove('playing');
-        });
-
-        // Highlight current step
-        this.container.querySelectorAll(`[data-step="${step}"]`).forEach(cell => {
-            cell.classList.add('playing');
-        });
+    highlightStep(localStep, playingBar) {
+        // Rimuovi tutti gli highlight precedenti
+        this.container.querySelectorAll('.drum-cell.playing')
+            .forEach(cell => cell.classList.remove('playing'));
+        
+        // In play mode o se stiamo visualizzando la battuta corrente
+        if (!this.drumMachine.isEditMode || this.currentBar === playingBar) {
+            // Calcola lo step corretto nella vista corrente
+            const stepInView = localStep + (this.currentBar * 32);
+            
+            this.container.querySelectorAll(`.drum-cell[data-step="${stepInView}"]`)
+                .forEach(cell => cell.classList.add('playing'));
+        }
     }
 
     setParameterChangeCallback(callback) {
@@ -477,6 +668,8 @@ export class DrumMachineRender extends AbstractHTMLRender {
     }
 
     updateSequenceDisplay(sequence) {
+        if (!sequence) return;  // Aggiungi questo check
+        
         // Prima rimuoviamo tutte le classi active e accent
         this.container.querySelectorAll('.drum-cell').forEach(cell => {
             cell.classList.remove('active', 'accent');
@@ -486,18 +679,124 @@ export class DrumMachineRender extends AbstractHTMLRender {
         Object.entries(sequence).forEach(([drum, steps]) => {
             const row = this.container.querySelector(`.drum-row[data-drum="${drum}"]`);
             if (row) {
-                steps.forEach((step, index) => {
-                    const cell = row.querySelector(`[data-step="${index}"]`);
-                    if (cell) {
-                        if (step.active) {
-                            cell.classList.add('active');
-                            if (step.velocity > 1) {
-                                cell.classList.add('accent');
-                            }
+                const visibleSteps = steps.slice(this.currentBar * 32, (this.currentBar + 1) * 32);
+                visibleSteps.forEach((step, localIndex) => {
+                    const cell = row.querySelector(`[data-step="${(this.currentBar * 32) + localIndex}"]`);
+                    if (cell && step?.active) {
+                        cell.classList.add('active');
+                        if (step.velocity > 1) {
+                            cell.classList.add('accent');
                         }
                     }
                 });
             }
         });
     }
+
+    setupNavigationControls() {
+        this.navControls = {
+            prev: this.container.querySelector('.prev-section'),
+            next: this.container.querySelector('.next-section'),
+            display: this.container.querySelector('.section-display'),
+            edit: this.createEditModeButton()  // Ora il metodo esiste
+        };
+
+        // Aggiungi il bottone edit/play
+        this.container.querySelector('.nav-controls').appendChild(this.navControls.edit);
+        
+        // Event handlers per la navigazione
+        this.navControls.prev.addEventListener('click', () => {
+            if (this.drumMachine.isEditMode) {
+                this.drumMachine.navigateToBar(this.drumMachine.currentBar - 1);
+            }
+        });
+
+        this.navControls.next.addEventListener('click', () => {
+            if (this.drumMachine.isEditMode) {
+                this.drumMachine.navigateToBar(this.drumMachine.currentBar + 1);
+            }
+        });
+
+        // Inizializza la vista con i valori corretti
+        this.updateView(this.drumMachine.currentBar, this.drumMachine.numBars);
+    }
+
+    updateView(barNumber, totalBars) {
+        // Aggiorna lo stato interno
+        this.currentBar = barNumber;
+
+        // Aggiorna i controlli di navigazione
+        if (this.navControls) {
+            this.navControls.prev.disabled = !this.drumMachine.isEditMode || barNumber === 0;
+            this.navControls.next.disabled = !this.drumMachine.isEditMode || barNumber === totalBars - 1;
+            this.navControls.display.textContent = `BAR ${barNumber + 1}/${totalBars}`;
+        }
+
+        // Aggiorna la griglia con gli step corretti
+        this.updateGridView();
+    }
+
+    setEditMode(enabled) {
+        if (this.navControls?.edit) {
+            this.navControls.edit.classList.toggle('active', enabled);
+            this.navControls.edit.textContent = enabled ? 'EDIT' : 'PLAY';
+        }
+
+        // Aggiorna lo stato dei controlli di navigazione
+        if (this.navControls) {
+            this.navControls.prev.disabled = !enabled || this.drumMachine.currentBar === 0;
+            this.navControls.next.disabled = !enabled || this.drumMachine.currentBar === this.drumMachine.numBars - 1;
+        }
+    }
+
+    showBar(barNumber) {
+        if (barNumber !== this.currentBar) {
+            this.currentBar = barNumber;
+            this.updateGridView();
+            
+            // Aggiorna il display
+            const display = this.container.querySelector('.section-display');
+            if (display) {
+                display.textContent = `BAR ${barNumber + 1}`;
+            }
+        }
+    }
+
+    updateGridView() {
+        if (!this.drumMachine?.sequence) return;  // Aggiungi questo check
+
+        const startStep = this.currentBar * 32;
+        const cells = this.container.querySelectorAll('.drum-cell');
+        
+        // Aggiorna gli step visualizzati
+        cells.forEach(cell => {
+            const originalStep = parseInt(cell.dataset.step) % 32; // Mantieni solo l'offset locale
+            cell.dataset.step = originalStep + startStep; // Aggiungi l'offset della battuta
+        });
+
+        // Aggiorna lo stato delle celle dalla sequenza
+        this.updateSequenceDisplay(this.drumMachine.sequence);
+    }
+
+    createEditModeButton() {
+        const btn = document.createElement('button');
+        btn.className = 'edit-mode-btn active';  // Attivo di default
+        btn.textContent = 'EDIT';
+        
+        btn.addEventListener('click', () => {
+            const isEdit = !this.drumMachine.isEditMode;
+            this.drumMachine.setEditMode(isEdit);
+        });
+
+        return btn;
+    }
+
+    // Costanti per il layout del sequencer
+    static GRID_CONSTANTS = {
+        CELL_WIDTH: 30,
+        CELL_SPACING: 4,
+        STEPS_PER_PAGE: 32,
+        STEPS_PER_BAR: 8,
+        BAR_SPACING: 12
+    };
 }
