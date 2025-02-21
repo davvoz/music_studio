@@ -607,7 +607,7 @@
 }
 
 /* Remove the old .tb303-wave styles as they're no longer needed */
-/* ...rest of existing code... */
+
 
 .pattern-memory {
     display: grid;
@@ -834,7 +834,7 @@
     display: none;
 }
 
-/* ...rest of existing code... */
+
 
 
 

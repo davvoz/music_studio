@@ -1,13 +1,15 @@
 import { AbstractInstrument } from "../../abstract/AbstractInstrument.js";
 import { SamplerRender } from "./SamplerRender.js";
+import { MIDIMapping } from "../../../core/MIDIMapping.js";  // Aggiungi questo import
 
 export class Sampler extends AbstractInstrument {
     constructor(context) {
         super(context);
         // Aggiungi un ID univoco per ogni istanza
         this.instanceId = 'sampler_' + Date.now();
-        // Passa l'ID al renderer
-        this.renderer = new SamplerRender(this.instanceId);
+        this.midiMapping = new MIDIMapping(); // Aggiungi il supporto MIDI
+        // Passa sia l'ID che l'istanza del sampler
+        this.renderer = new SamplerRender(this.instanceId, this);
         this.currentSample = null;
         
         this.parameters = {
@@ -290,5 +292,31 @@ export class Sampler extends AbstractInstrument {
                 startOffset: Math.random() < 0.4 ? Math.random() * 0.2 : 0
             };
         });
+    }
+
+    // Aggiungi questo metodo per gestire i messaggi MIDI
+    handleInstrumentMIDI(message) {
+        const result = this.midiMapping.handleMIDIMessage(message);
+        console.log('Sampler MIDI result:', result, 'from message:', message.data);
+        
+        if (result.mapped && result.trigger && result.param?.startsWith('pattern')) {
+            const patternNum = parseInt(result.param.replace('pattern', ''));
+            this.loadPattern(patternNum);
+            
+            // Aggiorna l'interfaccia
+            const buttons = this.renderer.container.querySelectorAll('.pattern-btn');
+            buttons.forEach(btn => btn.classList.remove('active'));
+            const selectedBtn = this.renderer.container.querySelector(`.pattern-btn[data-pattern="${patternNum}"]`);
+            if (selectedBtn) {
+                selectedBtn.classList.add('active');
+            }
+        }
+    }
+
+    restoreMIDIMappings(mappings) {
+        if (this.midiMapping && mappings) {
+            this.midiMapping.setMappings(mappings);
+            this.renderer?.updateMIDIMappings?.(mappings);
+        }
     }
 }

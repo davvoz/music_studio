@@ -2,9 +2,10 @@ import { AbstractHTMLRender } from "../../abstract/AbstractHTMLRender.js";
 import { Knob } from "../../../components/Knob.js";
 
 export class SamplerRender extends AbstractHTMLRender {
-    constructor(instanceId) {
+    constructor(instanceId, sampler) {  // Aggiungi parametro sampler
         super();
         this.instanceId = instanceId;
+        this.sampler = sampler;  // Salva il riferimento al sampler
         this.container.classList.add('sampler');
         this.container.setAttribute('data-instance-id', this.instanceId);
         this.paramChangeCallback = null;
@@ -62,10 +63,15 @@ export class SamplerRender extends AbstractHTMLRender {
                             <button class="length-btn" data-length="16">16</button>
                             <button class="length-btn active" data-length="32">32</button>
                         </div>
-                        <div class="pattern-buttons">
-                            ${Array(8).fill().map((_, i) => 
-                                `<button class="pattern-btn" data-pattern="${i + 1}">${i + 1}</button>`
-                            ).join('')}
+                        <div class="pattern-memory">
+                            ${Array(8).fill().map((_, i) => `
+                                <div class="memory-slot">
+                                    <button class="pattern-btn" data-pattern="${i + 1}">${i + 1}</button>
+                                    <button class="midi-learn-btn" data-param="pattern${i + 1}">
+                                        <span>MIDI</span>
+                                    </button>
+                                </div>
+                            `).join('')}
                         </div>
                         <button class="save-pattern">SAVE</button>
                     </div>
@@ -184,6 +190,35 @@ export class SamplerRender extends AbstractHTMLRender {
                 // Genera un nuovo pattern quando cambia la lunghezza
                 this.paramChangeCallback?.('patternLength', length);
             });
+        });
+
+        // Aggiungi handler per MIDI learn
+        this.container.addEventListener('click', (e) => {
+            const midiBtn = e.target.closest('.midi-learn-btn');
+            if (midiBtn) {
+                e.stopPropagation();
+                
+                // Reset altri pulsanti MIDI learn
+                this.container.querySelectorAll('.midi-learn-btn.learning').forEach(btn => {
+                    if (btn !== midiBtn) {
+                        btn.classList.remove('learning');
+                        this.sampler.midiMapping.stopLearning();
+                    }
+                });
+
+                const isLearning = midiBtn.classList.toggle('learning');
+                if (isLearning) {
+                    this.sampler.midiMapping.startLearning(midiBtn.dataset.param);
+                    setTimeout(() => {
+                        if (midiBtn.classList.contains('learning')) {
+                            midiBtn.classList.remove('learning');
+                            this.sampler.midiMapping.stopLearning();
+                        }
+                    }, 10000);
+                } else {
+                    this.sampler.midiMapping.stopLearning();
+                }
+            }
         });
     }
 
@@ -390,5 +425,33 @@ export class SamplerRender extends AbstractHTMLRender {
                 });
             });
         });
+    }
+
+    createMemorySlot(index) {
+        const slot = document.createElement('div');
+        slot.className = 'memory-slot';
+        slot.dataset.slot = index.toString();
+
+        const btn = document.createElement('button');
+        btn.className = 'memory-btn';
+        btn.dataset.slot = index.toString();
+        btn.textContent = index.toString();
+
+        const midiLearnBtn = this.createMidiLearnButton(index);
+
+        slot.append(btn, midiLearnBtn);
+        return slot;
+    }
+
+    createMidiLearnButton(index) {
+        const btn = document.createElement('button');
+        btn.className = 'midi-learn-btn';
+        btn.dataset.param = `pattern${index}`;
+        
+        const span = document.createElement('span');
+        span.textContent = 'MIDI';
+        btn.appendChild(span);
+        
+        return btn;
     }
 }
