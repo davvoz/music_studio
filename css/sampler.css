@@ -423,6 +423,7 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    z-index: 10;
 }
 
 .memory-slot:hover .midi-learn-btn {
@@ -436,6 +437,13 @@
     background: rgba(255, 0, 0, 0.8);
     color: white;
     animation: pulse 1s infinite;
+}
+
+.midi-learn-btn.mapped {
+    opacity: 1;
+    transform: scale(1);
+    background: rgba(0, 255, 0, 0.8);
+    color: black;
 }
 
 @keyframes pulse {
@@ -459,6 +467,8 @@
     flex-direction: column;
     align-items: center;
     gap: 5px;
+    position: relative;  /* Aggiunto */
+    padding: 2px;       /* Aggiunto */
 }
 
 .control-group label {
@@ -550,5 +560,57 @@
     cursor: pointer;
     border: 2px solid #1E2328;
     box-shadow: 0 0 4px rgba(0, 255, 157, 0.5);
+}
+
+/* Stili per i pulsanti MIDI learn */
+.midi-learn-btn {
+    position: absolute;
+    top: 0;            /* Modificato */
+    right: 0;          /* Modificato */
+    transform: scale(0);
+    opacity: 0;
+    transition: all 0.2s ease;
+    background: rgba(30, 30, 30, 0.9);
+    border: 1px solid #666;
+    color: #999;
+    font-size: 8px;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 100;      /* Aumentato */
+}
+
+/* Mostra il pulsante al hover del control-group */
+.control-group:hover .midi-learn-btn {
+    opacity: 1;
+    transform: scale(1);
+    transform-origin: top right;  /* Aggiunto */
+}
+
+/* Stato di apprendimento attivo */
+.midi-learn-btn.learning {
+    opacity: 1;
+    transform: scale(1);
+    background: rgba(255, 0, 0, 0.8);
+    color: white;
+    animation: midiLearnPulse 1s infinite;
+}
+
+/* Stato mappato */
+.midi-learn-btn.mapped {
+    opacity: 1;
+    transform: scale(1);
+    background: rgba(0, 255, 0, 0.8);
+    color: black;
+}
+
+@keyframes midiLearnPulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
 }
 

@@ -417,7 +417,7 @@ export class AudioEngine {
         }
 
         this.updateMuteSoloStates();
-        this.updateInstrumentState(id, this.instrumentStates.get(id)?.muted || false, shouldSolo);
+       // this.updateInstrumentState(id, this.instrumentStates.get(id)?.muted || false, shouldSolo);
     }
 
     updateMuteSoloStates() {

@@ -219,29 +219,38 @@ export class SamplerRender extends AbstractHTMLRender {
         // Aggiungi handler per MIDI learn
         this.container.addEventListener('click', (e) => {
             const midiBtn = e.target.closest('.midi-learn-btn');
-            if (midiBtn) {
-                e.stopPropagation();
-                
-                // Reset altri pulsanti MIDI learn
-                this.container.querySelectorAll('.midi-learn-btn.learning').forEach(btn => {
-                    if (btn !== midiBtn) {
-                        btn.classList.remove('learning');
-                        this.sampler.midiMapping.stopLearning();
-                    }
-                });
-
-                const isLearning = midiBtn.classList.toggle('learning');
-                if (isLearning) {
-                    this.sampler.midiMapping.startLearning(midiBtn.dataset.param);
-                    setTimeout(() => {
-                        if (midiBtn.classList.contains('learning')) {
-                            midiBtn.classList.remove('learning');
-                            this.sampler.midiMapping.stopLearning();
-                        }
-                    }, 10000);
-                } else {
+            if (!midiBtn) return;
+            
+            e.stopPropagation();
+            console.log('MIDI learn clicked for:', midiBtn.dataset.param);
+            
+            // Reset altri pulsanti MIDI learn attivi
+            this.container.querySelectorAll('.midi-learn-btn.learning').forEach(btn => {
+                if (btn !== midiBtn) {
+                    btn.classList.remove('learning');
                     this.sampler.midiMapping.stopLearning();
                 }
+            });
+
+            // Toggle modalità apprendimento
+            const isLearning = midiBtn.classList.toggle('learning');
+            
+            if (isLearning) {
+                this.sampler.midiMapping.startLearning(midiBtn.dataset.param);
+                
+                // Evidenzia visivamente il pulsante attivo
+                midiBtn.style.transform = 'scale(1)';
+                midiBtn.style.opacity = '1';
+                
+                // Timeout di sicurezza (10 secondi)
+                setTimeout(() => {
+                    if (midiBtn.classList.contains('learning')) {
+                        midiBtn.classList.remove('learning');
+                        this.sampler.midiMapping.stopLearning();
+                    }
+                }, 10000);
+            } else {
+                this.sampler.midiMapping.stopLearning();
             }
         });
     }
@@ -502,5 +511,48 @@ export class SamplerRender extends AbstractHTMLRender {
         btn.appendChild(span);
         
         return btn;
+    }
+
+    // Aggiungi questo nuovo metodo per aggiornare i controlli UI
+    updateControl(param, value) {
+        const control = this.container.querySelector(`.${param}`);
+        if (!control) return;
+
+        // Aggiorna il valore del controllo
+        control.value = value;
+
+        // Aggiorna anche il display del valore
+        const valueDisplay = this.container.querySelector(`.${param}-value`);
+        if (valueDisplay) {
+            switch(param) {
+                case 'filter-cutoff':
+                    const freq = Math.round(Math.exp(Math.log(20) + value * (Math.log(20000) - Math.log(20))));
+                    valueDisplay.textContent = freq + 'Hz';
+                    break;
+                case 'filter-resonance':
+                    valueDisplay.textContent = Math.round(value * 30);
+                    break;
+                case 'global-gain':
+                    valueDisplay.textContent = value.toFixed(1);
+                    break;
+                case 'global-pitch':
+                    valueDisplay.textContent = Math.round(value);
+                    break;
+                case 'global-length':
+                    valueDisplay.textContent = value.toFixed(1);
+                    break;
+                default:
+                    valueDisplay.textContent = value;
+            }
+        }
+    }
+
+    // Aggiungi questo metodo per aggiornare lo stato dei pulsanti MIDI
+    updateMidiMapping(param, isMapped) {
+        const midiBtn = this.container.querySelector(`.midi-learn-btn[data-param="${param}"]`);
+        if (midiBtn) {
+            midiBtn.classList.toggle('mapped', isMapped);
+            midiBtn.classList.remove('learning');
+        }
     }
 }

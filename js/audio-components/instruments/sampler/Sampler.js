@@ -304,34 +304,47 @@ export class Sampler extends AbstractInstrument {
         console.log('Sampler MIDI result:', result, 'from message:', message.data);
         
         if (result.mapped) {
+            // Converti il nome del parametro nel formato corretto per l'UI
+            const uiParam = this.getUIParamName(result.param);
+            
             switch(result.param) {
                 case 'filterCutoff':
                     this.updateFilterCutoff(result.value);
-                    this.renderer.updateKnobValue?.(result.param, result.value);
+                    this.renderer.updateControl('filter-cutoff', result.value);
                     break;
                 case 'filterResonance':
                     this.updateFilterResonance(result.value);
-                    this.renderer.updateKnobValue?.(result.param, result.value);
+                    this.renderer.updateControl('filter-resonance', result.value);
+                    break;
+                case 'gain':
+                    this.parameters.gain = result.value * 2; // Scala 0-2
+                    this.gainNode.gain.value = this.parameters.gain;
+                    this.renderer.updateControl('global-gain', result.value * 2);
                     break;
                 case 'globalPitch':
-                    this.parameters.globalPitch = (result.value * 4) - 2; // Range -2 to +2
+                    const pitchValue = (result.value * 48) - 24; // Scala -24 to +24
+                    this.parameters.globalPitch = pitchValue;
+                    this.renderer.updateControl('global-pitch', pitchValue);
                     break;
                 case 'globalLength':
-                    this.parameters.globalLength = result.value * 4; // Range 0 to 4
+                    const lengthValue = result.value * 4; // Scala 0-4
+                    this.parameters.globalLength = lengthValue;
+                    this.renderer.updateControl('global-length', lengthValue);
                     break;
                 default:
                     if (!result.param?.startsWith('pattern')) {
                         this.updateParameter(result.param, result.value);
+                        this.renderer.updateControl(uiParam, result.value);
                     }
             }
-            this.renderer.updateKnobValue?.(result.param, result.value);
         }
 
+        // Gestione pattern triggers
         if (result.mapped && result.trigger && result.param?.startsWith('pattern')) {
             const patternNum = parseInt(result.param.replace('pattern', ''));
             this.loadPattern(patternNum);
             
-            // Aggiorna l'interfaccia
+            // Update UI
             const buttons = this.renderer.container.querySelectorAll('.pattern-btn');
             buttons.forEach(btn => btn.classList.remove('active'));
             const selectedBtn = this.renderer.container.querySelector(`.pattern-btn[data-pattern="${patternNum}"]`);
@@ -339,6 +352,23 @@ export class Sampler extends AbstractInstrument {
                 selectedBtn.classList.add('active');
             }
         }
+
+        // Aggiorna lo stato del mapping MIDI nell'UI
+        if (result.justMapped) {
+            this.renderer.updateMidiMapping(result.param, true);
+        }
+    }
+
+    // Utility per convertire i nomi dei parametri
+    getUIParamName(param) {
+        const mapping = {
+            'filterCutoff': 'filter-cutoff',
+            'filterResonance': 'filter-resonance',
+            'gain': 'global-gain',
+            'globalPitch': 'global-pitch',
+            'globalLength': 'global-length'
+        };
+        return mapping[param] || param;
     }
 
     updateFilterCutoff(value) {
