@@ -38,16 +38,39 @@ export class SamplerRender extends AbstractHTMLRender {
                             <label>Level</label>
                             <input type="range" class="global-gain" min="0" max="2" value="1" step="0.1">
                             <span class="global-gain-value">1.0</span>
+                            <button class="midi-learn-btn" data-param="gain"><span>MIDI</span></button>
                         </div>
                         <div class="control-group">
                             <label>Global Pitch</label>
                             <input type="range" class="global-pitch" min="-24" max="24" value="0" step="1">
                             <span class="global-pitch-value">0</span>
+                            <button class="midi-learn-btn" data-param="globalPitch"><span>MIDI</span></button>
                         </div>
                         <div class="control-group">
                             <label>Global Length</label>
                             <input type="range" class="global-length" min="0.1" max="4" value="1" step="0.1">
                             <span class="global-length-value">1.0</span>
+                            <button class="midi-learn-btn" data-param="globalLength"><span>MIDI</span></button>
+                        </div>
+                        <div class="control-group">
+                            <label>Filter Cutoff</label>
+                            <input type="range" class="filter-cutoff" min="0" max="1" value="1" step="0.01">
+                            <span class="filter-cutoff-value">20000</span>
+                            <button class="midi-learn-btn" data-param="filterCutoff"><span>MIDI</span></button>
+                        </div>
+                        <div class="control-group">
+                            <label>Filter Resonance</label>
+                            <input type="range" class="filter-resonance" min="0" max="1" value="0" step="0.01">
+                            <span class="filter-resonance-value">0</span>
+                            <button class="midi-learn-btn" data-param="filterResonance"><span>MIDI</span></button>
+                        </div>
+                        <div class="control-group">
+                            <label>Filter Type</label>
+                            <select class="filter-type">
+                                <option value="lowpass">Low Pass</option>
+                                <option value="highpass">High Pass</option>
+                                <option value="bandpass">Band Pass</option>
+                            </select>
                         </div>
                     </div>
                     <div class="pattern-controls">
@@ -82,6 +105,7 @@ export class SamplerRender extends AbstractHTMLRender {
 
         this.createSequencer();
         this.setupEventListeners();
+        this.setupFilterControls();
     }
 
     setupEventListeners() {
@@ -219,6 +243,31 @@ export class SamplerRender extends AbstractHTMLRender {
                     this.sampler.midiMapping.stopLearning();
                 }
             }
+        });
+    }
+
+    setupFilterControls() {
+        const cutoffSlider = this.container.querySelector('.filter-cutoff');
+        const resonanceSlider = this.container.querySelector('.filter-resonance');
+        const filterType = this.container.querySelector('.filter-type');
+        const cutoffValue = this.container.querySelector('.filter-cutoff-value');
+        const resonanceValue = this.container.querySelector('.filter-resonance-value');
+
+        cutoffSlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            const freq = Math.round(Math.exp(Math.log(20) + value * (Math.log(20000) - Math.log(20))));
+            cutoffValue.textContent = freq + 'Hz';
+            this.paramChangeCallback?.('filterCutoff', value);
+        });
+
+        resonanceSlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            resonanceValue.textContent = Math.round(value * 30);
+            this.paramChangeCallback?.('filterResonance', value);
+        });
+
+        filterType.addEventListener('change', (e) => {
+            this.paramChangeCallback?.('filterType', e.target.value);
         });
     }
 

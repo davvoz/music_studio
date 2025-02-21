@@ -16,7 +16,10 @@ export class Sampler extends AbstractInstrument {
             gain: 1.0,         // Aumentato il gain default
             patternLength: 32,  // Aggiungi la lunghezza del pattern di default
             globalPitch: 0,    // Aggiungi pitch globale
-            globalLength: 1.0  // Aggiungi length globale
+            globalLength: 1.0,  // Aggiungi length globale
+            filterCutoff: 1.0,     // Nuovo parametro
+            filterResonance: 0.0,  // Nuovo parametro
+            filterType: 'lowpass'  // Nuovo parametro
         };
 
         // Initialize sequence with length parameter
@@ -36,9 +39,18 @@ export class Sampler extends AbstractInstrument {
             length: 1
         })));
 
-        // Audio routing
+        // Correggi l'ordine di creazione e configurazione della catena audio
         this.gainNode = this.context.createGain();
-        this.gainNode.connect(this.instrumentOutput);
+        this.filter = this.context.createBiquadFilter();
+        
+        // Imposta i valori iniziali del filtro in modo più aggressivo
+        this.filter.type = 'lowpass';
+        this.filter.frequency.value = 2000; // Frequenza iniziale più bassa per sentire l'effetto
+        this.filter.Q.value = 5; // Q iniziale più alto
+        
+        // Correggi il routing audio
+        this.gainNode.connect(this.filter);
+        this.filter.connect(this.instrumentOutput);
         this.gainNode.gain.value = this.parameters.gain;
 
         this.setupEventListeners(); // Aggiungi questa chiamata
@@ -81,6 +93,16 @@ export class Sampler extends AbstractInstrument {
                 case 'globalPitch':
                 case 'globalLength':
                     this.parameters[param] = value;
+                    break;
+                case 'filterCutoff':
+                    this.updateFilterCutoff(value);
+                    break;
+                case 'filterResonance':
+                    this.updateFilterResonance(value);
+                    break;
+                case 'filterType':
+                    this.filter.type = value;
+                    console.log('Filter type:', value);
                     break;
                 default:
                     this.parameters[param] = value;
@@ -135,45 +157,27 @@ export class Sampler extends AbstractInstrument {
         const finalPitch = pitch + this.parameters.globalPitch;
         source.playbackRate.value = Math.pow(2, finalPitch/12);
         
+        // Correggi il routing: source -> gainNode -> filter -> output
         source.connect(this.gainNode);
         
-        // Aumentato il gain complessivo
-        const mainGain = velocity * this.parameters.gain * 1.5; // Moltiplicatore extra
+        // Rimuovi il gainNode extra che bypassava il filtro
+        const mainGain = velocity * this.parameters.gain * 1.5;
         
-        // Imposta il gain con rampa per evitare click
         this.gainNode.gain.cancelScheduledValues(time);
         this.gainNode.gain.setValueAtTime(0, time);
         this.gainNode.gain.linearRampToValueAtTime(mainGain, time + 0.005);
         
-        // Calcola durata e offset
         const baseDuration = this.currentSample.buffer.duration;
-        const actualDuration = Math.max(0.01, baseDuration * length * this.parameters.globalLength); // Previeni durate negative o zero
-        const actualStart = Math.min(baseDuration * startOffset, baseDuration - 0.01); // Previeni start oltre la fine
+        const actualDuration = Math.max(0.01, baseDuration * length * this.parameters.globalLength);
+        const actualStart = Math.min(baseDuration * startOffset, baseDuration - 0.01);
 
         try {
             source.start(time, actualStart, actualDuration);
-            
-            // Fade out alla fine per evitare click
             this.gainNode.gain.setValueAtTime(mainGain, time + actualDuration - 0.005);
             this.gainNode.gain.linearRampToValueAtTime(0, time + actualDuration);
         } catch (error) {
             console.error('Error playing sample:', error);
         }
-
-        // Fix velocity control
-        const gainNode = this.context.createGain();
-        gainNode.connect(this.gainNode);
-        
-        // Calculate final gain with velocity
-        const finalGain = Math.min(1.5, velocity * this.parameters.gain);
-        
-        // Apply gain envelope
-        gainNode.gain.setValueAtTime(0, time);
-        gainNode.gain.linearRampToValueAtTime(finalGain, time + 0.005);
-        gainNode.gain.setValueAtTime(finalGain, time + actualDuration - 0.005);
-        gainNode.gain.linearRampToValueAtTime(0, time + actualDuration);
-        
-        source.connect(gainNode);
     }
 
     updateSequence(step, active, pitch = 0, velocity = 1, length = 1, startOffset = 0) {
@@ -299,6 +303,30 @@ export class Sampler extends AbstractInstrument {
         const result = this.midiMapping.handleMIDIMessage(message);
         console.log('Sampler MIDI result:', result, 'from message:', message.data);
         
+        if (result.mapped) {
+            switch(result.param) {
+                case 'filterCutoff':
+                    this.updateFilterCutoff(result.value);
+                    this.renderer.updateKnobValue?.(result.param, result.value);
+                    break;
+                case 'filterResonance':
+                    this.updateFilterResonance(result.value);
+                    this.renderer.updateKnobValue?.(result.param, result.value);
+                    break;
+                case 'globalPitch':
+                    this.parameters.globalPitch = (result.value * 4) - 2; // Range -2 to +2
+                    break;
+                case 'globalLength':
+                    this.parameters.globalLength = result.value * 4; // Range 0 to 4
+                    break;
+                default:
+                    if (!result.param?.startsWith('pattern')) {
+                        this.updateParameter(result.param, result.value);
+                    }
+            }
+            this.renderer.updateKnobValue?.(result.param, result.value);
+        }
+
         if (result.mapped && result.trigger && result.param?.startsWith('pattern')) {
             const patternNum = parseInt(result.param.replace('pattern', ''));
             this.loadPattern(patternNum);
@@ -310,6 +338,58 @@ export class Sampler extends AbstractInstrument {
             if (selectedBtn) {
                 selectedBtn.classList.add('active');
             }
+        }
+    }
+
+    updateFilterCutoff(value) {
+        const minFreq = 20;
+        const maxFreq = 20000;
+        this.parameters.filterCutoff = value;
+        
+        // Usa una scala logaritmica più precisa per la frequenza
+        const normValue = Math.max(0, Math.min(1, value)); // Assicurati che il valore sia tra 0 e 1
+        const frequency = minFreq * Math.pow(maxFreq/minFreq, normValue);
+        
+        // Applica immediatamente il cambiamento
+        const now = this.context.currentTime;
+        this.filter.frequency.cancelScheduledValues(now);
+        this.filter.frequency.exponentialRampToValueAtTime(frequency, now + 0.016);
+        
+        console.log('Filter frequency:', frequency, 'Hz');
+    }
+
+    updateFilterResonance(value) {
+        this.parameters.filterResonance = value;
+        
+        // Usa una scala più aggressiva per la risonanza
+        const normValue = Math.max(0, Math.min(1, value));
+        const Q = normValue * 30; // Aumentato il range della risonanza
+        
+        // Applica immediatamente il cambiamento
+        const now = this.context.currentTime;
+        this.filter.Q.cancelScheduledValues(now);
+        this.filter.Q.linearRampToValueAtTime(Q, now + 0.016);
+        
+        console.log('Filter Q:', Q);
+    }
+
+    updateParameter(param, value) {
+        if (!this.parameters[param]) return;
+        
+        this.parameters[param] = value;
+        
+        switch(param) {
+            case 'filterCutoff':
+                this.updateFilterCutoff(value);
+                break;
+            case 'filterResonance':
+                this.updateFilterResonance(value);
+                break;
+            case 'filterType':
+                this.filter.type = value;
+                console.log('Filter type set to:', value);
+                break;
+            // ...existing parameter cases...
         }
     }
 
