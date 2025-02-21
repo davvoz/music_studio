@@ -449,7 +449,8 @@
 .nav-controls {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 6px;
+    padding: 0 10px;
 }
 
 .nav-btn {
@@ -531,6 +532,23 @@
 }
 
 .edit-mode-btn.active {
+    background: var(--accent-color);
+    color: var(--primary-bg);
+}
+
+.copy-btn,
+.paste-btn {
+    background: var(--primary-bg);
+    border: 1px solid var(--accent-color);
+    color: var(--accent-color);
+    font-size: 11px;
+    padding: 4px 8px;
+    min-width: 50px;
+    margin-left: 10px;
+}
+
+.copy-btn.active,
+.paste-btn.active {
     background: var(--accent-color);
     color: var(--primary-bg);
 }

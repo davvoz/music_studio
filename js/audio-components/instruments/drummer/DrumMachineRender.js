@@ -181,8 +181,20 @@ export class DrumMachineRender extends AbstractHTMLRender {
         const prevBtn = this.createNavigationButton('prev-section', '◀', true);
         const sectionDisplay = this.createSectionDisplay();
         const nextBtn = this.createNavigationButton('next-section', '▶', false);
+        
+        // Aggiungi i pulsanti copy/paste
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'nav-btn copy-btn';
+        copyBtn.textContent = 'COPY';
+        
+        const pasteBtn = document.createElement('button');
+        pasteBtn.className = 'nav-btn paste-btn';
+        pasteBtn.textContent = 'PASTE';
+        
+        copyBtn.addEventListener('click', () => this.handleCopy());
+        pasteBtn.addEventListener('click', () => this.handlePaste());
 
-        navControls.append(prevBtn, sectionDisplay, nextBtn);
+        navControls.append(prevBtn, sectionDisplay, nextBtn, copyBtn, pasteBtn);
         return navControls;
     }
 
@@ -632,37 +644,147 @@ export class DrumMachineRender extends AbstractHTMLRender {
 
     copySteps(start, end) {
         const data = {};
+        // Calcola l'offset basato sulla battuta corrente
+        const barOffset = this.currentBar * 32;
+        const globalStart = barOffset + start;
+        const globalEnd = barOffset + end;
+        
         this.container.querySelectorAll('.drum-row').forEach(row => {
             const drum = row.dataset.drum;
-            data[drum] = Array.from(row.querySelectorAll('.drum-cell'))
-                .slice(start, end)
-                .map(cell => ({
-                    active: cell.classList.contains('active'),
-                    accent: cell.classList.contains('accent'),
-                    velocity: cell.classList.contains('accent') ? 1.5 : 
-                             cell.classList.contains('active') ? 1 : 0
-                }));
+            data[drum] = Array.from(this.drumMachine.sequence[drum]
+                .slice(globalStart, globalEnd)
+                .map(step => ({
+                    active: step.active,
+                    accent: step.velocity > 1,
+                    velocity: step.velocity
+                })));
         });
         return data;
     }
 
     pasteSteps(data, targetStep) {
+        // Calcola l'offset basato sulla battuta corrente
+        const barOffset = this.currentBar * 32;
+        const globalTargetStep = barOffset + targetStep;
+        
         Object.entries(data).forEach(([drum, steps]) => {
-            const row = this.container.querySelector(`.drum-row[data-drum="${drum}"]`);
-            if (row) {
-                steps.forEach((stepData, index) => {
-                    const cell = row.querySelector(`[data-step="${targetStep + index}"]`);
-                    if (cell) {
-                        cell.classList.remove('active', 'accent');
-                        if (stepData.accent) {
-                            cell.classList.add('active', 'accent');
-                        } else if (stepData.active) {
-                            cell.classList.add('active');
-                        }
-                        this.sequenceChangeCallback?.(drum, targetStep + index, 
-                            stepData.active, stepData.velocity);
+            steps.forEach((stepData, index) => {
+                const globalStep = globalTargetStep + index;
+                // Verifica che non stiamo scrivendo oltre i limiti della sequenza
+                if (globalStep < this.drumMachine.selectedLength) {
+                    this.drumMachine.sequence[drum][globalStep] = {
+                        active: stepData.active,
+                        velocity: stepData.accent ? 1.5 : stepData.active ? 1 : 0
+                    };
+                }
+            });
+        });
+        
+        // Aggiorna la visualizzazione
+        this.updateSequenceDisplay(this.drumMachine.sequence);
+    }
+
+    addCopyPasteControls(gridElement) {
+        let copyStart = -1;
+        let copyEnd = -1;
+        let selectionBox = null;
+    
+        const clearSelection = () => {
+            if (selectionBox) {
+                selectionBox.remove();
+                selectionBox = null;
+            }
+            copyStart = -1;
+            copyEnd = -1;
+        };
+    
+        const createSelectionBox = (start, end) => {
+            if (selectionBox) selectionBox.remove();
+            
+            const startCell = gridElement.querySelector(`[data-step="${start}"]`);
+            const endCell = gridElement.querySelector(`[data-step="${end}"]`);
+            if (!startCell || !endCell) return;
+            
+            const rect = {
+                left: Math.min(startCell.offsetLeft, endCell.offsetLeft),
+                top: 0,
+                width: Math.abs(endCell.offsetLeft - startCell.offsetLeft) + endCell.offsetWidth,
+                height: gridElement.offsetHeight
+            };
+    
+            selectionBox = document.createElement('div');
+            selectionBox.className = 'selection-box';
+            selectionBox.style.cssText = `
+                position: absolute;
+                left: ${rect.left}px;
+                top: ${rect.top}px;
+                width: ${rect.width}px;
+                height: ${rect.height}px;
+                background: rgba(0, 255, 157, 0.1);
+                border: 1px solid rgba(0, 255, 157, 0.3);
+                pointer-events: none;
+                z-index: 1;
+            `;
+            
+            gridElement.appendChild(selectionBox);
+        };
+    
+        gridElement.addEventListener('mousedown', e => {
+            const cell = e.target.closest('.drum-cell');
+            if (!cell) return;
+            
+            copyStart = parseInt(cell.dataset.step) % 32; // Usiamo solo l'offset locale
+            copyEnd = copyStart;
+            createSelectionBox(copyStart, copyEnd);
+        });
+    
+        gridElement.addEventListener('mousemove', e => {
+            if (copyStart === -1) return;
+            
+            const cell = e.target.closest('.drum-cell');
+            if (!cell) return;
+            
+            copyEnd = parseInt(cell.dataset.step) % 32; // Usiamo solo l'offset locale
+            createSelectionBox(copyStart, copyEnd);
+        });
+    
+        gridElement.addEventListener('mouseup', () => {
+            if (copyStart !== -1 && copyEnd !== -1) {
+                const start = Math.min(copyStart, copyEnd);
+                const end = Math.max(copyStart, copyEnd) + 1;
+                const copiedData = this.copySteps(start, end);
+                
+                // Salva i dati copiati nel localStorage
+                localStorage.setItem('drumMachineCopyBuffer', JSON.stringify({
+                    data: copiedData,
+                    length: end - start
+                }));
+            }
+            clearSelection();
+        });
+    
+        // Gestione CTRL+V
+        document.addEventListener('keydown', e => {
+            if (e.ctrlKey && e.key === 'v') {
+                const savedBuffer = localStorage.getItem('drumMachineCopyBuffer');
+                if (savedBuffer) {
+                    const { data, length } = JSON.parse(savedBuffer);
+                    // Troviamo la cella più vicina al mouse
+                    const mouseX = e.clientX;
+                    const cells = Array.from(gridElement.querySelectorAll('.drum-cell'));
+                    const targetCell = cells.reduce((closest, cell) => {
+                        const rect = cell.getBoundingClientRect();
+                        const distance = Math.abs(rect.left - mouseX);
+                        return (!closest || distance < closest.distance) 
+                            ? { cell, distance } 
+                            : closest;
+                    }, null);
+    
+                    if (targetCell) {
+                        const targetStep = parseInt(targetCell.cell.dataset.step) % 32;
+                        this.pasteSteps(data, targetStep);
                     }
-                });
+                }
             }
         });
     }
@@ -789,6 +911,36 @@ export class DrumMachineRender extends AbstractHTMLRender {
         });
 
         return btn;
+    }
+
+    handleCopy() {
+        // Copia l'intera battuta corrente
+        const start = 0;
+        const end = 32;
+        const copiedData = this.copySteps(start, end);
+        
+        localStorage.setItem('drumMachineCopyBuffer', JSON.stringify({
+            data: copiedData,
+            length: end - start
+        }));
+
+        // Feedback visivo
+        const copyBtn = this.container.querySelector('.copy-btn');
+        copyBtn.classList.add('active');
+        setTimeout(() => copyBtn.classList.remove('active'), 200);
+    }
+
+    handlePaste() {
+        const savedBuffer = localStorage.getItem('drumMachineCopyBuffer');
+        if (savedBuffer) {
+            const { data } = JSON.parse(savedBuffer);
+            this.pasteSteps(data, 0); // Incolliamo sempre all'inizio della battuta corrente
+            
+            // Feedback visivo
+            const pasteBtn = this.container.querySelector('.paste-btn');
+            pasteBtn.classList.add('active');
+            setTimeout(() => pasteBtn.classList.remove('active'), 200);
+        }
     }
 
     // Costanti per il layout del sequencer

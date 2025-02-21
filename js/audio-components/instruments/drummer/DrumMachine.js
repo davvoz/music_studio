@@ -378,37 +378,17 @@ export class DrumMachine extends AbstractInstrument {
                 const patternNum = result.param.replace('pattern', '');
                 console.log('Loading drum pattern from MIDI:', patternNum);
                 
-                // Prima attiva visualmente il pulsante
-                const buttons = this.renderer.container.querySelectorAll('.memory-btn');
-                buttons.forEach(btn => btn.classList.remove('active'));
-                
-                const selectedBtn = this.renderer.container.querySelector(`.memory-btn[data-slot="${patternNum}"]`);
-                if (selectedBtn) {
-                    selectedBtn.classList.add('active');
-                }
-
-                // Carica il pattern
-                const savedPattern = localStorage.getItem(`${this.instanceId}-pattern-${patternNum}`);
-                if (savedPattern) {
-                    const pattern = JSON.parse(savedPattern);
-                    
-                    // Reset della sequenza prima di caricare il nuovo pattern
-                    this.clearPattern();
-                    
-                    // Carica il nuovo pattern
-                    Object.entries(pattern).forEach(([drum, steps]) => {
-                        if (this.sequence[drum]) {
-                            this.sequence[drum] = steps.map(value => ({
-                                active: value > 0,
-                                velocity: value === 2 ? 1.5 : value === 1 ? 1 : 0
-                            }));
-                        }
+                // Carica il pattern usando il metodo esistente
+                if (this.loadSavedPattern(patternNum)) {
+                    // Aggiorna l'interfaccia dei pulsanti
+                    const buttons = this.renderer.container.querySelectorAll('.memory-btn');
+                    buttons.forEach(btn => {
+                        btn.classList.toggle('active', btn.dataset.slot === patternNum);
                     });
-
-                    // Aggiorna l'interfaccia
+                    
+                    // Forza l'aggiornamento dell'interfaccia
                     this.renderer.updateSequenceDisplay(this.sequence);
                     localStorage.setItem(`${this.instanceId}-last-pattern`, patternNum);
-                    console.log('Drum pattern loaded:', patternNum);
                 }
             }
         }
