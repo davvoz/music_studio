@@ -41,159 +41,146 @@ export class RenderEngine {
     }
 
     setupTransportSection() {
+        const transport = this.createTransportContainer();
+        this.setupTransportControls(transport);
+        this.setupProjectControls(transport);
+        this.setupTempoControls(transport);
+        this.container.appendChild(transport);
+        this.setupBeatUpdateListener();
+    }
+
+    createTransportContainer() {
         const transport = document.createElement('div');
         transport.className = 'transport-section';
+        this.transportState = this.createTransportState();
+        transport.appendChild(this.transportState);
+        return transport;
+    }
 
-        // Transport state display
-        this.transportState = document.createElement('div');
-        this.transportState.className = 'transport-state';
-        this.transportState.textContent = 'STOPPED';
+    createTransportState() {
+        const state = document.createElement('div');
+        state.className = 'transport-state';
+        state.textContent = 'STOPPED';
+        return state;
+    }
 
-        // Play/Stop buttons
-        const playButton = document.createElement('button');
-        playButton.textContent = '►';
-        playButton.onclick = () => {
+    setupTransportControls(transport) {
+        const playButton = this.createButton('►', () => {
             this.audioEngine.start();
-            this.transportState.textContent = 'PLAYING';
-            playButton.classList.add('active');
-            stopButton.classList.remove('active');
-        };
+            this.updateTransportUI('PLAYING', playButton, stopButton);
+        });
 
-        const stopButton = document.createElement('button');
-        stopButton.textContent = '■';
-        stopButton.onclick = () => {
+        const stopButton = this.createButton('■', () => {
             this.audioEngine.stop();
-            this.transportState.textContent = 'STOPPED';
-            stopButton.classList.add('active');
-            playButton.classList.remove('active');
-        };
+            this.updateTransportUI('STOPPED', stopButton, playButton);
+        });
 
-        // Add metronome button after play/stop buttons
-        const metronomeButton = document.createElement('button');
-        metronomeButton.textContent = '🔔';
-        metronomeButton.className = 'metronome-button';
-        metronomeButton.onclick = () => {
-            const isEnabled = this.audioEngine.toggleMetronome();
-            metronomeButton.classList.toggle('active', isEnabled);
-        };
-
-        // Add Instrument button in transport section
-        const addButton = document.createElement('button');
+        const addButton = this.createButton('+ Add Instrument', () => this.showInstrumentModal());
         addButton.className = 'add-instrument-btn';
-        addButton.textContent = '+ Add Instrument';
-        addButton.onclick = () => this.showInstrumentModal();
 
-        // Aggiungi i pulsanti per il progetto dopo il pulsante Add Instrument
+        transport.append(playButton, stopButton, addButton);
+    }
+
+    createButton(text, onClick) {
+        const button = document.createElement('button');
+        button.textContent = text;
+        button.onclick = onClick;
+        return button;
+    }
+
+    updateTransportUI(state, activeButton, inactiveButton) {
+        this.transportState.textContent = state;
+        activeButton.classList.add('active');
+        inactiveButton.classList.remove('active');
+    }
+
+    setupProjectControls(transport) {
         const projectControls = document.createElement('div');
         projectControls.className = 'project-controls';
-        
-        const saveProjectBtn = document.createElement('button');
-        saveProjectBtn.className = 'save-project-btn';
-        saveProjectBtn.textContent = 'Save Project';
-        saveProjectBtn.onclick = () => this.saveProject();
 
-        const loadProjectBtn = document.createElement('button');
-        loadProjectBtn.className = 'load-project-btn';
-        loadProjectBtn.textContent = 'Load Project';
-        loadProjectBtn.onclick = () => this.loadProject();
+        const saveButton = this.createButton('Save Project', () => this.saveProject());
+        const loadButton = this.createButton('Load Project', () => this.loadProject());
+        saveButton.className = 'save-project-btn';
+        loadButton.className = 'load-project-btn';
 
-        projectControls.append(saveProjectBtn, loadProjectBtn);
+        projectControls.append(saveButton, loadButton);
+        transport.appendChild(projectControls);
+    }
 
-        // Tempo section
+    setupTempoControls(transport) {
         const tempoSection = document.createElement('div');
         tempoSection.className = 'tempo-section';
-        
+
         const tempoLabel = document.createElement('span');
         tempoLabel.textContent = 'BPM: ';
-        
-        const tempoInput = document.createElement('input');
-        tempoInput.type = 'number';
-        tempoInput.value = this.audioEngine.tempo / 4; // Dividiamo per 4 il valore visualizzato
-        tempoInput.min = '30';
-        tempoInput.max = '300';
-        
-        // Use change instead of input event
+
+        const tempoInput = this.createTempoInput();
+
+        tempoSection.append(tempoLabel, tempoInput);
+        transport.appendChild(tempoSection);
+    }
+
+    createTempoInput() {
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.value = this.audioEngine.tempo / 4;
+        input.min = '30';
+        input.max = '300';
+
         let tempoTimeout;
-        tempoInput.addEventListener('change', (e) => {
+        input.addEventListener('change', (e) => {
             clearTimeout(tempoTimeout);
             tempoTimeout = setTimeout(() => {
-                const displayValue = parseInt(e.target.value);
-                const actualTempo = displayValue * 4;
-                this.audioEngine.setTempo(actualTempo);
+                const displayValue = parseInt(e.target.value, 10);
+                this.audioEngine.setTempo(displayValue * 4);
             }, 100);
         }, { passive: true });
 
-        // Beat indicators
-        const beatDisplay = document.createElement('div');
-        beatDisplay.className = 'beat-display';
-        
-        for (let i = 0; i < 16; i++) {
-            const beat = document.createElement('div');
-            beat.className = 'beat-indicator';
-            if (i % 4 === 0) beat.classList.add('bar-start');
-            beatDisplay.appendChild(beat);
-            this.beatIndicators.push(beat);
-        }
+        return input;
+    }
 
-        // Current beat/bar display
-        this.currentBeatDisplay = document.createElement('div');
-        this.currentBeatDisplay.className = 'current-beat';
-        this.currentBeatDisplay.textContent = '1.1';
-
-        tempoSection.append(tempoLabel, tempoInput);
-        transport.append(
-            this.transportState,
-            playButton, 
-            stopButton, 
-            //metronomeButton,
-            addButton,  // Add the button here
-            projectControls,  // Aggiungi i controlli del progetto
-            tempoSection,
-            //beatDisplay,
-            //this.currentBeatDisplay
-        );
-        
-        this.container.appendChild(transport);
-
-        // Setup beat update listener
+    setupBeatUpdateListener() {
         this.audioEngine.onBeatUpdate = (beat) => {
             this.updateBeatIndicators(beat);
         };
     }
 
-    saveProject() {
+    async saveProject() {
+        const project = this.createProjectData();
+        await this.persistProject(project);
+    }
+
+    createProjectData() {
         const project = {
             tempo: this.audioEngine.tempo,
             instruments: []
         };
 
         this.audioEngine.instruments.forEach((instrument, id) => {
-            const type = instrument.constructor.name;
-            const config = {
-                id,
-                type,
-                parameters: instrument.parameters,
-                sequence: instrument.sequence,
-                // Aggiungi le mappature MIDI se l'instrument le supporta
-                midiMappings: instrument.midiMapping?.getMappings() || {}
-            };
-            project.instruments.push(config);
+            project.instruments.push(this.serializeInstrument(instrument, id));
         });
 
+        return project;
+    }
+
+    serializeInstrument(instrument, id) {
+        return {
+            id,
+            type: instrument.constructor.name,
+            parameters: instrument.parameters,
+            sequence: instrument.sequence,
+            midiMappings: instrument.midiMapping?.getMappings() || {}
+        };
+    }
+
+    async persistProject(project) {
         try {
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
             const projectKey = `music_studio_project_${timestamp}`;
+            
             localStorage.setItem(projectKey, JSON.stringify(project));
-
-            // Salva la lista dei progetti
-            const projectsList = JSON.parse(localStorage.getItem('music_studio_projects') || '[]');
-            projectsList.push({
-                key: projectKey,
-                name: `Project ${timestamp}`,
-                date: timestamp
-            });
-            localStorage.setItem('music_studio_projects', JSON.stringify(projectsList));
-
+            await this.updateProjectsList(projectKey, timestamp);
+            
             alert('Project saved successfully!');
         } catch (error) {
             console.error('Error saving project:', error);
@@ -201,105 +188,142 @@ export class RenderEngine {
         }
     }
 
-    loadProject() {
+    async updateProjectsList(projectKey, timestamp) {
         const projectsList = JSON.parse(localStorage.getItem('music_studio_projects') || '[]');
-        if (projectsList.length === 0) {
+        projectsList.push({
+            key: projectKey,
+            name: `Project ${timestamp}`,
+            date: timestamp
+        });
+        localStorage.setItem('music_studio_projects', JSON.stringify(projectsList));
+    }
+
+    async loadProject() {
+        const projectsList = JSON.parse(localStorage.getItem('music_studio_projects') || '[]');
+        if (!projectsList.length) {
             alert('No saved projects found!');
             return;
         }
 
+        const modal = this.createProjectModal(projectsList);
+        this.setupModalHandlers(modal, projectsList);
+        document.body.appendChild(modal);
+    }
+
+    createProjectModal(projectsList) {
         const modal = document.createElement('div');
         modal.className = 'project-modal';
-        modal.innerHTML = `
+        modal.innerHTML = this.getProjectModalHTML(projectsList);
+        return modal;
+    }
+
+    getProjectModalHTML(projectsList) {
+        return `
             <div class="modal-content">
                 <h2>Load Project</h2>
                 <div class="projects-list">
-                    ${projectsList.map(proj => `
-                        <div class="project-item" data-key="${proj.key}">
-                            <span>${proj.name}</span>
-                            <span class="project-date">${new Date(proj.date).toLocaleString()}</span>
-                            <button class="delete-project">✕</button>
-                        </div>
-                    `).join('')}
+                    ${this.getProjectListHTML(projectsList)}
                 </div>
                 <button class="modal-close">Close</button>
             </div>
         `;
+    }
 
+    getProjectListHTML(projectsList) {
+        return projectsList.map(proj => `
+            <div class="project-item" data-key="${proj.key}">
+                <span>${proj.name}</span>
+                <span class="project-date">${new Date(proj.date).toLocaleString()}</span>
+                <button class="delete-project">✕</button>
+            </div>
+        `).join('');
+    }
+
+    setupModalHandlers(modal, projectsList) {
         modal.querySelector('.modal-close').onclick = () => modal.remove();
+        modal.addEventListener('click', (e) => this.handleModalClick(e, modal, projectsList));
+    }
 
-        modal.addEventListener('click', async (e) => {
-            const projectItem = e.target.closest('.project-item');
-            const deleteBtn = e.target.closest('.delete-project');
+    async handleModalClick(e, modal, projectsList) {
+        const projectItem = e.target.closest('.project-item');
+        const deleteBtn = e.target.closest('.delete-project');
 
-            if (deleteBtn) {
-                e.stopPropagation();
-                const key = projectItem.dataset.key;
-                if (confirm('Delete this project?')) {
-                    localStorage.removeItem(key);
-                    const updatedList = projectsList.filter(p => p.key !== key);
-                    localStorage.setItem('music_studio_projects', JSON.stringify(updatedList));
-                    projectItem.remove();
-                }
-                return;
-            }
+        if (deleteBtn) {
+            e.stopPropagation();
+            await this.handleProjectDelete(projectItem, projectsList);
+            return;
+        }
 
-            if (projectItem) {
-                const key = projectItem.dataset.key;
-                const projectData = JSON.parse(localStorage.getItem(key));
-                await this.loadProjectData(projectData);
-                modal.remove();
-            }
-        });
+        if (projectItem) {
+            await this.handleProjectLoad(projectItem, modal);
+        }
+    }
 
-        document.body.appendChild(modal);
+    async handleProjectDelete(projectItem, projectsList) {
+        const key = projectItem.dataset.key;
+        if (!confirm('Delete this project?')) return;
+
+        localStorage.removeItem(key);
+        const updatedList = projectsList.filter(p => p.key !== key);
+        localStorage.setItem('music_studio_projects', JSON.stringify(updatedList));
+        projectItem.remove();
+    }
+
+    async handleProjectLoad(projectItem, modal) {
+        const key = projectItem.dataset.key;
+        const projectData = JSON.parse(localStorage.getItem(key));
+        await this.loadProjectData(projectData);
+        modal.remove();
     }
 
     async loadProjectData(project) {
-        // Stop playback and clear current instruments
         this.audioEngine.stop();
+        await this.clearCurrentInstruments();
+        this.audioEngine.setTempo(project.tempo);
+        await this.loadInstruments(project.instruments);
+        
+        if (project.masterMIDIMappings) {
+            this.audioEngine.setMasterMIDIMappings(project.masterMIDIMappings);
+        }
+    }
+
+    async clearCurrentInstruments() {
         Array.from(this.audioEngine.instruments.keys()).forEach(id => {
             this.audioEngine.removeInstrument(id);
             const element = this.instrumentRack.querySelector(`[data-instance-id="${id}"]`);
             element?.remove();
         });
+    }
 
-        // Set tempo
-        this.audioEngine.setTempo(project.tempo);
-
-        // Load instruments
-        for (const inst of project.instruments) {
+    async loadInstruments(instruments) {
+        for (const inst of instruments) {
             try {
-                const InstrumentClass = this.getInstrumentClass(inst.type);
-                if (InstrumentClass) {
-                    const instrument = new InstrumentClass(this.audioEngine.context);
-                    
-                    // Restore parameters and sequence
-                    Object.assign(instrument.parameters, inst.parameters);
-                    if (inst.sequence) {
-                        instrument.sequence = inst.sequence;
-                    }
-
-                    // Restore MIDI mappings if available
-                    if (inst.midiMappings && instrument.midiMapping) {
-                        instrument.midiMapping.setMappings(inst.midiMappings);
-                    }
-
-                    // Add instrument to engine
-                    this.audioEngine.addInstrument(inst.id, instrument);
-                    this.addInstrumentUI(inst.id, instrument);
-
-                    // Allow time for instrument initialization
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                }
+                await this.loadSingleInstrument(inst);
             } catch (error) {
                 console.error(`Error loading instrument ${inst.type}:`, error);
             }
         }
+    }
 
-        if (project.masterMIDIMappings) {
-            this.audioEngine.setMasterMIDIMappings(project.masterMIDIMappings);
+    async loadSingleInstrument(inst) {
+        const InstrumentClass = this.getInstrumentClass(inst.type);
+        if (!InstrumentClass) return;
+
+        const instrument = new InstrumentClass(this.audioEngine.context);
+        Object.assign(instrument.parameters, inst.parameters);
+        
+        if (inst.sequence) {
+            instrument.sequence = inst.sequence;
         }
+
+        if (inst.midiMappings && instrument.midiMapping) {
+            instrument.midiMapping.setMappings(inst.midiMappings);
+        }
+
+        this.audioEngine.addInstrument(inst.id, instrument);
+        this.addInstrumentUI(inst.id, instrument);
+        
+        await new Promise(resolve => setTimeout(resolve, 100));
     }
 
     getInstrumentClass(type) {

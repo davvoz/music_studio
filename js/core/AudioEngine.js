@@ -402,7 +402,7 @@ export class AudioEngine {
         }
 
         this.updateMuteSoloStates();
-        this.updateInstrumentState(id, shouldMute, this.instrumentStates.get(id)?.soloed || false);
+        //this.updateInstrumentState(id, shouldMute, this.instrumentStates.get(id)?.soloed || false);
     }
 
     soloInstrument(id, shouldSolo) {
